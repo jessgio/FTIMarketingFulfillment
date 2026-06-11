@@ -46,7 +46,7 @@ import {
   parseMarketingImportCsv,
   type MarketingImportPreviewRow,
 } from "../../lib/marketingImport";
-import { MarketingChatUnreadBadge } from "../../components/marketing/MarketingChatUnreadBadge";
+import { MarketingChatNotifications } from "../../components/marketing/MarketingChatNotifications";
 import { MarketingDashboard } from "../../components/marketing/MarketingDashboard";
 import { MarketingRequestDetailModal } from "../../components/marketing/MarketingRequestDetailModal";
 import { MarketingPortalShipmentsPanel } from "../../components/marketing/MarketingPortalShipmentsPanel";
@@ -612,7 +612,15 @@ function MarketingPageContent() {
             <h1 className="text-xl font-black text-gray-900">Request Goods</h1>
           </div>
           <div className="flex items-center gap-3">
-            <MarketingChatUnreadBadge count={totalUnread} />
+            <MarketingChatNotifications
+              session={session}
+              totalUnread={totalUnread}
+              onRefresh={refreshUnread}
+              onOpenRequest={(requestId) => {
+                setViewingRequestId(requestId);
+                setDeepLinkChatOpen(true);
+              }}
+            />
             <span className="text-sm text-gray-600 hidden sm:block">
               {session.displayName}
               <span className="text-gray-400"> · </span>

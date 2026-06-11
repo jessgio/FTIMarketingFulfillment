@@ -3,6 +3,7 @@ import { getSupabaseErrorMessage } from "./supabaseError";
 import { mentionHandleFromEmail } from "./marketingMentions";
 import { canFulfill, normalizeUserRole } from "./marketingRoles";
 import type {
+  MarketingChatNotification,
   MarketingChatParticipant,
   MarketingRequestMessage,
   MarketingSession,
@@ -125,4 +126,64 @@ export async function fetchUnreadChatCounts(session: MarketingSession): Promise<
   }
 
   return { total, byRequestId };
+}
+
+export async function fetchUnreadChatNotifications(
+  session: MarketingSession
+): Promise<MarketingChatNotification[]> {
+  const { data: reads, error: readsError } = await supabase
+    .from("marketing_request_chat_reads")
+    .select("request_id, last_read_at")
+    .eq("reader_email", session.email);
+
+  if (readsError) throw new Error(getSupabaseErrorMessage(readsError, "Failed to load read state"));
+
+  const readAt = new Map((reads ?? []).map((row) => [row.request_id, row.last_read_at]));
+
+  let requestsQuery = supabase.from("marketing_requests").select("id, barcode, recipient_name");
+  if (!canFulfill(session)) {
+    requestsQuery = requestsQuery.eq("requested_by_email", session.email);
+  }
+
+  const { data: requests, error: requestsError } = await requestsQuery;
+  if (requestsError) throw new Error(getSupabaseErrorMessage(requestsError, "Failed to load requests"));
+
+  const requestMeta = new Map(
+    (requests ?? []).map((row) => [
+      row.id,
+      { barcode: row.barcode, recipientName: row.recipient_name },
+    ])
+  );
+  const requestIds = [...requestMeta.keys()];
+  if (requestIds.length === 0) return [];
+
+  const { data: messages, error: messagesError } = await supabase
+    .from("marketing_request_messages")
+    .select("id, request_id, author_name, body, created_at")
+    .in("request_id", requestIds)
+    .neq("author_email", session.email)
+    .order("created_at", { ascending: false });
+
+  if (messagesError) throw new Error(getSupabaseErrorMessage(messagesError, "Failed to load messages"));
+
+  const notifications: MarketingChatNotification[] = [];
+
+  for (const msg of messages ?? []) {
+    const lastRead = readAt.get(msg.request_id);
+    if (!lastRead || new Date(msg.created_at) > new Date(lastRead)) {
+      const meta = requestMeta.get(msg.request_id);
+      if (!meta) continue;
+      notifications.push({
+        id: msg.id,
+        requestId: msg.request_id,
+        barcode: meta.barcode,
+        recipientName: meta.recipientName,
+        authorName: msg.author_name,
+        body: msg.body,
+        createdAt: msg.created_at,
+      });
+    }
+  }
+
+  return notifications;
 }

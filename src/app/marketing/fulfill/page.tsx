@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { CenteredPage, DashButton, SurfaceCard, cx, fieldInput } from "../../../components/dashboard/primitives";
 import { ChatLoginBar } from "../../../components/marketing/ChatLoginBar";
-import { MarketingChatUnreadBadge } from "../../../components/marketing/MarketingChatUnreadBadge";
+import { MarketingChatNotifications } from "../../../components/marketing/MarketingChatNotifications";
 import { MarketingNewOrdersBadge } from "../../../components/marketing/MarketingNewOrdersBadge";
 import { MarketingRequestDetailModal } from "../../../components/marketing/MarketingRequestDetailModal";
 import { MarketingShipmentsRegistry } from "../../../components/marketing/MarketingShipmentsRegistry";
@@ -441,7 +441,20 @@ function MarketingFulfillPageContent() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <MarketingChatUnreadBadge count={totalUnread} />
+            <MarketingChatNotifications
+              session={chatSession}
+              totalUnread={totalUnread}
+              onRefresh={refreshUnread}
+              onOpenRequest={(requestId) => {
+                setViewingRequestId(requestId);
+                setDeepLinkChatOpen(true);
+                if (chatSession && canFulfill(chatSession)) {
+                  void markMarketingRequestSeenByAdmin(chatSession, requestId).then(() =>
+                    refreshUnseen()
+                  );
+                }
+              }}
+            />
             <MarketingNewOrdersBadge count={totalUnseen} />
             <div className="text-sm font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full">
               {pendingCount} pending

@@ -60,6 +60,16 @@ export interface MarketingRequestMessage {
   created_at: string;
 }
 
+export interface MarketingChatNotification {
+  id: string;
+  requestId: string;
+  barcode: string;
+  recipientName: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface MarketingUser {
   id: string;
   email: string;

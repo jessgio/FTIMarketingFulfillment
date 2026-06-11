@@ -41,3 +41,19 @@
     color: #374151;
   }
 }
+
+@keyframes blink-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+}
+
+@utility animate-blink-dot {
+  animation: blink-dot 1.2s ease-in-out infinite;
+}
