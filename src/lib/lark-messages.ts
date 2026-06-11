@@ -1,4 +1,4 @@
-import type { LarkPostContent, LarkPostParagraph } from "./lark";
+import type { LarkInteractiveCard } from "./lark";
 
 function formatPackageStatus(status: string) {
   const normalized = status.trim().toLowerCase();
@@ -6,23 +6,45 @@ function formatPackageStatus(status: string) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function metadataLine(label: string, value: string | null | undefined): LarkPostParagraph | null {
-  if (!value?.trim()) return null;
-  return [{ tag: "text", text: `${label}: ${value.trim()}` }];
+function escapeLarkMd(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/([*_`\[\]])/g, "\\$1");
 }
 
-function blankLine(): LarkPostParagraph {
-  return [{ tag: "text", text: "" }];
+function markdownDiv(content: string) {
+  return {
+    tag: "div",
+    text: {
+      tag: "lark_md",
+      content,
+    },
+  };
 }
 
-function linkLine(label: string, url: string, linkText = "Open"): LarkPostParagraph {
-  return [
-    { tag: "text", text: `${label}: ` },
-    { tag: "a", text: linkText, href: url },
-  ];
+function openButton(label: string, url: string) {
+  return {
+    tag: "action",
+    actions: [
+      {
+        tag: "button",
+        text: {
+          tag: "plain_text",
+          content: label,
+        },
+        type: "primary",
+        url,
+      },
+    ],
+  };
 }
 
-export function buildMentionLarkPost(opts: {
+function metadataLines(entries: Array<[string, string | null | undefined]>): string {
+  return entries
+    .filter(([, value]) => value?.trim())
+    .map(([label, value]) => `${label}: ${value!.trim()}`)
+    .join("\n");
+}
+
+export function buildMentionLarkCard(opts: {
   barcode: string;
   recipientName: string;
   status: string;
@@ -31,7 +53,7 @@ export function buildMentionLarkPost(opts: {
   mentionedHandles: string[];
   messagePlain: string;
   packageUrl: string;
-}): LarkPostContent {
+}): LarkInteractiveCard {
   const {
     barcode,
     recipientName,
@@ -49,53 +71,69 @@ export function buildMentionLarkPost(opts: {
       ? mentionedHandles.map((h) => `@${h}`).join(", ")
       : null;
 
-  const metadata = [
-    metadataLine("Barcode", barcode),
-    metadataLine("Recipient", recipientName),
-    metadataLine("Status", statusLabel),
-    metadataLine("Requested by", requestedByName),
-    metadataLine("From", authorName),
-    metadataLine("Mentioned", mentioned),
-  ].filter((line): line is LarkPostParagraph => line !== null);
+  const metadata = metadataLines([
+    ["Barcode", barcode],
+    ["Recipient", recipientName],
+    ["Status", statusLabel],
+    ["Requested by", requestedByName],
+    ["From", authorName],
+    ["Mentioned", mentioned],
+  ]);
 
-  const message = messagePlain.trim().slice(0, 4000);
+  const message = escapeLarkMd(messagePlain.trim().slice(0, 2000));
 
   return {
-    title: `💬 Package chat mention — ${statusLabel}`,
-    content: [
-      ...metadata,
-      blankLine(),
-      [{ tag: "text", text: message, style: ["bold"] }],
-      blankLine(),
-      linkLine("Open thread", packageUrl),
+    config: {
+      wide_screen_mode: true,
+    },
+    header: {
+      template: "blue",
+      title: {
+        tag: "plain_text",
+        content: `💬 Package chat mention — ${statusLabel}`,
+      },
+    },
+    elements: [
+      markdownDiv(metadata),
+      markdownDiv(`**${message}**`),
+      openButton("Open thread", packageUrl),
     ],
   };
 }
 
-export function buildShippedLarkPost(opts: {
+export function buildShippedLarkCard(opts: {
   barcode: string;
   recipientName: string;
   requestedByName: string;
   shippedBy: string;
   shippedAt: string | null;
   packageUrl: string;
-}): LarkPostContent {
+}): LarkInteractiveCard {
   const { barcode, recipientName, requestedByName, shippedBy, shippedAt, packageUrl } = opts;
 
   const shippedAtLabel = shippedAt
     ? new Date(shippedAt).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })
     : null;
 
-  const metadata = [
-    metadataLine("Barcode", barcode),
-    metadataLine("Recipient", recipientName),
-    metadataLine("Requested by", requestedByName),
-    metadataLine("Shipped by", shippedBy),
-    metadataLine("Shipped at", shippedAtLabel),
-  ].filter((line): line is LarkPostParagraph => line !== null);
+  const metadata = metadataLines([
+    ["Barcode", barcode],
+    ["Recipient", recipientName],
+    ["Requested by", requestedByName],
+    ["Shipped by", shippedBy],
+    ["Shipped at", shippedAtLabel],
+  ]);
 
   return {
-    title: "📦 Package shipped",
-    content: [...metadata, linkLine("Open fulfillment", packageUrl)],
+    config: {
+      wide_screen_mode: true,
+    },
+    header: {
+      template: "green",
+      title: {
+        tag: "plain_text",
+        content: "📦 Package shipped",
+      },
+    },
+    elements: [markdownDiv(metadata), openButton("Open fulfillment", packageUrl)],
   };
 }

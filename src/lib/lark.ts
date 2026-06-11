@@ -4,27 +4,18 @@ export type LarkWebhookKind = "chat" | "alerts";
 
 export type LarkSendResult = { ok: true } | { ok: false; error: string };
 
-export type LarkPostLocale = "en_us" | "zh_cn";
-
-export type LarkPostTextElement = {
-  tag: "text";
-  text: string;
-  style?: Array<"bold" | "italic" | "underline" | "lineThrough">;
-};
-
-export type LarkPostLinkElement = {
-  tag: "a";
-  text: string;
-  href: string;
-};
-
-export type LarkPostElement = LarkPostTextElement | LarkPostLinkElement;
-
-export type LarkPostParagraph = LarkPostElement[];
-
-export type LarkPostContent = {
-  title?: string;
-  content: LarkPostParagraph[];
+export type LarkInteractiveCard = {
+  config?: {
+    wide_screen_mode?: boolean;
+  };
+  header?: {
+    template?: string;
+    title: {
+      tag: "plain_text";
+      content: string;
+    };
+  };
+  elements: Array<Record<string, unknown>>;
 };
 
 function webhookUrl(kind: LarkWebhookKind): string | undefined {
@@ -89,19 +80,14 @@ export async function sendLarkText(
   );
 }
 
-export async function sendLarkPost(
-  post: LarkPostContent,
-  opts?: { webhookKind?: LarkWebhookKind; locale?: LarkPostLocale }
+export async function sendLarkCard(
+  card: LarkInteractiveCard,
+  opts?: { webhookKind?: LarkWebhookKind }
 ): Promise<LarkSendResult> {
-  const locale = opts?.locale ?? "en_us";
   return sendLarkPayload(
     {
-      msg_type: "post",
-      content: {
-        post: {
-          [locale]: post,
-        },
-      },
+      msg_type: "interactive",
+      card,
     },
     opts
   );

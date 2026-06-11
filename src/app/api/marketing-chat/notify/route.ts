@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getAppOrigin } from "../../../../lib/app-origin";
-import { isLarkConfigured, sendLarkPost } from "../../../../lib/lark";
-import { buildMentionLarkPost } from "../../../../lib/lark-messages";
+import { isLarkConfigured, sendLarkCard } from "../../../../lib/lark";
+import { buildMentionLarkCard } from "../../../../lib/lark-messages";
 import { buildMarketingThreadUrl } from "../../../../lib/marketingDeepLinks";
 import { supabase } from "../../../../lib/supabaseClient";
 import { mentionHandleFromEmail, parseMentionedEmails } from "../../../../lib/marketingMentions";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     if (mentionedEmails.length > 0 && larkConfigured) {
       const origin = getAppOrigin(new URL(request.url).origin);
       const threadUrl = buildMarketingThreadUrl(origin, message.request_id);
-      const larkPost = buildMentionLarkPost({
+      const larkCard = buildMentionLarkCard({
         barcode: pkg.barcode,
         recipientName: pkg.recipient_name,
         status: pkg.status,
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         messagePlain: message.body,
         packageUrl: threadUrl,
       });
-      const larkResult = await sendLarkPost(larkPost, { webhookKind: "chat" });
+      const larkResult = await sendLarkCard(larkCard, { webhookKind: "chat" });
       if (!larkResult.ok) {
         console.error("Lark mention notify failed:", larkResult.error);
         larkError = larkResult.error;
