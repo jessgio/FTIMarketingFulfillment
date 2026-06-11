@@ -4,6 +4,29 @@ export type LarkWebhookKind = "chat" | "alerts";
 
 export type LarkSendResult = { ok: true } | { ok: false; error: string };
 
+export type LarkPostLocale = "en_us" | "zh_cn";
+
+export type LarkPostTextElement = {
+  tag: "text";
+  text: string;
+  style?: Array<"bold" | "italic" | "underline" | "lineThrough">;
+};
+
+export type LarkPostLinkElement = {
+  tag: "a";
+  text: string;
+  href: string;
+};
+
+export type LarkPostElement = LarkPostTextElement | LarkPostLinkElement;
+
+export type LarkPostParagraph = LarkPostElement[];
+
+export type LarkPostContent = {
+  title?: string;
+  content: LarkPostParagraph[];
+};
+
 function webhookUrl(kind: LarkWebhookKind): string | undefined {
   if (kind === "alerts") {
     return process.env.LARK_ALERTS_WEBHOOK_URL || process.env.LARK_WEBHOOK_URL;
@@ -25,8 +48,8 @@ function applySignature(body: Record<string, unknown>) {
   body.sign = sign;
 }
 
-export async function sendLarkText(
-  text: string,
+async function sendLarkPayload(
+  body: Record<string, unknown>,
   opts?: { webhookKind?: LarkWebhookKind }
 ): Promise<LarkSendResult> {
   const url = webhookUrl(opts?.webhookKind ?? "chat");
@@ -34,10 +57,6 @@ export async function sendLarkText(
     return { ok: false, error: "Lark webhook not configured" };
   }
 
-  const body: Record<string, unknown> = {
-    msg_type: "text",
-    content: { text: text.slice(0, 4000) },
-  };
   applySignature(body);
 
   try {
@@ -55,4 +74,35 @@ export async function sendLarkText(
     const message = err instanceof Error ? err.message : "Lark request failed";
     return { ok: false, error: message };
   }
+}
+
+export async function sendLarkText(
+  text: string,
+  opts?: { webhookKind?: LarkWebhookKind }
+): Promise<LarkSendResult> {
+  return sendLarkPayload(
+    {
+      msg_type: "text",
+      content: { text: text.slice(0, 4000) },
+    },
+    opts
+  );
+}
+
+export async function sendLarkPost(
+  post: LarkPostContent,
+  opts?: { webhookKind?: LarkWebhookKind; locale?: LarkPostLocale }
+): Promise<LarkSendResult> {
+  const locale = opts?.locale ?? "en_us";
+  return sendLarkPayload(
+    {
+      msg_type: "post",
+      content: {
+        post: {
+          [locale]: post,
+        },
+      },
+    },
+    opts
+  );
 }

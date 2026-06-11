@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAppOrigin } from "../../../../lib/app-origin";
-import { isLarkConfigured, sendLarkText } from "../../../../lib/lark";
-import { buildShippedLarkText } from "../../../../lib/lark-messages";
+import { isLarkConfigured, sendLarkPost } from "../../../../lib/lark";
+import { buildShippedLarkPost } from "../../../../lib/lark-messages";
 import { supabase } from "../../../../lib/supabaseClient";
 
 export async function POST(request: Request) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const origin = getAppOrigin(new URL(request.url).origin);
     const packageUrl = `${origin}/marketing/fulfill`;
-    const larkText = buildShippedLarkText({
+    const larkPost = buildShippedLarkPost({
       barcode: pkg.barcode,
       recipientName: pkg.recipient_name,
       requestedByName: pkg.requested_by_name,
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       packageUrl,
     });
 
-    const larkResult = await sendLarkText(larkText, { webhookKind: "alerts" });
+    const larkResult = await sendLarkPost(larkPost, { webhookKind: "alerts" });
     if (!larkResult.ok) {
       console.error("Lark shipped notify failed:", larkResult.error);
       return NextResponse.json({ success: true, larkError: larkResult.error });

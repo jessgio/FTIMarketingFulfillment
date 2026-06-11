@@ -1,7 +1,4 @@
-function line(label: string, value: string | null | undefined) {
-  if (!value?.trim()) return "";
-  return `${label}: ${value.trim()}\n`;
-}
+import type { LarkPostContent, LarkPostParagraph } from "./lark";
 
 function formatPackageStatus(status: string) {
   const normalized = status.trim().toLowerCase();
@@ -9,7 +6,23 @@ function formatPackageStatus(status: string) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-export function buildMentionLarkText(opts: {
+function metadataLine(label: string, value: string | null | undefined): LarkPostParagraph | null {
+  if (!value?.trim()) return null;
+  return [{ tag: "text", text: `${label}: ${value.trim()}` }];
+}
+
+function blankLine(): LarkPostParagraph {
+  return [{ tag: "text", text: "" }];
+}
+
+function linkLine(label: string, url: string, linkText = "Open"): LarkPostParagraph {
+  return [
+    { tag: "text", text: `${label}: ` },
+    { tag: "a", text: linkText, href: url },
+  ];
+}
+
+export function buildMentionLarkPost(opts: {
   barcode: string;
   recipientName: string;
   status: string;
@@ -18,7 +31,7 @@ export function buildMentionLarkText(opts: {
   mentionedHandles: string[];
   messagePlain: string;
   packageUrl: string;
-}) {
+}): LarkPostContent {
   const {
     barcode,
     recipientName,
@@ -34,53 +47,55 @@ export function buildMentionLarkText(opts: {
   const mentioned =
     mentionedHandles.length > 0
       ? mentionedHandles.map((h) => `@${h}`).join(", ")
-      : undefined;
+      : null;
 
-  return [
-    `💬 Package chat mention — ${statusLabel}`,
-    "",
-    line("Barcode", barcode),
-    line("Recipient", recipientName),
-    line("Status", statusLabel),
-    line("Requested by", requestedByName),
-    line("From", authorName),
-    line("Mentioned", mentioned),
-    "",
-    messagePlain.trim(),
-    "",
-    `Open thread: ${packageUrl}`,
-  ]
-    .filter((row, i, arr) => row !== "" || (i > 0 && arr[i - 1] !== ""))
-    .join("\n")
-    .trim();
+  const metadata = [
+    metadataLine("Barcode", barcode),
+    metadataLine("Recipient", recipientName),
+    metadataLine("Status", statusLabel),
+    metadataLine("Requested by", requestedByName),
+    metadataLine("From", authorName),
+    metadataLine("Mentioned", mentioned),
+  ].filter((line): line is LarkPostParagraph => line !== null);
+
+  const message = messagePlain.trim().slice(0, 4000);
+
+  return {
+    title: `💬 Package chat mention — ${statusLabel}`,
+    content: [
+      ...metadata,
+      blankLine(),
+      [{ tag: "text", text: message, style: ["bold"] }],
+      blankLine(),
+      linkLine("Open thread", packageUrl),
+    ],
+  };
 }
 
-export function buildShippedLarkText(opts: {
+export function buildShippedLarkPost(opts: {
   barcode: string;
   recipientName: string;
   requestedByName: string;
   shippedBy: string;
   shippedAt: string | null;
   packageUrl: string;
-}) {
+}): LarkPostContent {
   const { barcode, recipientName, requestedByName, shippedBy, shippedAt, packageUrl } = opts;
 
   const shippedAtLabel = shippedAt
     ? new Date(shippedAt).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })
-    : undefined;
+    : null;
 
-  return [
-    "📦 Package shipped",
-    "",
-    line("Barcode", barcode),
-    line("Recipient", recipientName),
-    line("Requested by", requestedByName),
-    line("Shipped by", shippedBy),
-    line("Shipped at", shippedAtLabel),
-    "",
-    `Open fulfillment: ${packageUrl}`,
-  ]
-    .filter((row, i, arr) => row !== "" || (i > 0 && arr[i - 1] !== ""))
-    .join("\n")
-    .trim();
+  const metadata = [
+    metadataLine("Barcode", barcode),
+    metadataLine("Recipient", recipientName),
+    metadataLine("Requested by", requestedByName),
+    metadataLine("Shipped by", shippedBy),
+    metadataLine("Shipped at", shippedAtLabel),
+  ].filter((line): line is LarkPostParagraph => line !== null);
+
+  return {
+    title: "📦 Package shipped",
+    content: [...metadata, linkLine("Open fulfillment", packageUrl)],
+  };
 }
