@@ -141,6 +141,9 @@ export function MarketingRequestDetailModal({
           <div className="grid sm:grid-cols-3 gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
             <DetailRow label="Requested">
               <p className="font-semibold">{request.requested_by_name}</p>
+              {request.requested_by_division && (
+                <p className="text-xs font-bold uppercase text-violet-700">{request.requested_by_division}</p>
+              )}
               <p className="text-xs text-gray-600">{formatWhen(request.created_at)}</p>
             </DetailRow>
             <DetailRow label="Packed">

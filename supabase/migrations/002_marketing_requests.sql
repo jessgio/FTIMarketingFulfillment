@@ -48,9 +48,9 @@ create index if not exists marketing_request_items_request_id_idx
   on marketing_request_items (request_id);
 
 -- Seed marketing users (change emails and PINs in Supabase before go-live)
-insert into marketing_users (email, display_name, pin) values
-  ('marketing@fromthisisland.com', 'Marketing Team', '4821'),
-  ('pr@fromthisisland.com', 'PR Team', '7392')
+insert into marketing_users (email, display_name, pin, role, division) values
+  ('marketing@fromthisisland.com', 'Marketing Team', '4821', 'requester', 'Marketing'),
+  ('pr@fromthisisland.com', 'PR Team', '7392', 'requester', 'Marketing')
 on conflict (email) do nothing;
 
 alter table marketing_users disable row level security;

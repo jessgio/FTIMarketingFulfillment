@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, LogOut, MessageSquare } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { DashButton, SurfaceCard, fieldInput } from "../dashboard/primitives";
 import { clearMarketingSession, setMarketingSession } from "../../lib/marketingAuth";
 import { loginMarketingUser } from "../../lib/marketingDb";
+import { roleLabel } from "../../lib/marketingRoles";
 import type { MarketingSession } from "../../types/marketing";
 
 export function ChatLoginBar({
@@ -21,8 +22,8 @@ export function ChatLoginBar({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
     try {
       const s = await loginMarketingUser(email, pin);
       setMarketingSession(s);
@@ -42,16 +43,14 @@ export function ChatLoginBar({
 
   if (session) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-violet-50 border border-violet-200 mb-6">
-        <div className="flex items-center gap-2 text-sm">
-          <MessageSquare className="w-4 h-4 text-violet-700" />
-          <span className="text-gray-700">
-            Chatting as <span className="font-bold text-gray-900">{session.displayName}</span>
-            <span className="ml-1 text-xs font-bold uppercase text-violet-700">({session.role})</span>
-          </span>
-        </div>
-        <DashButton type="button" variant="ghost" size="sm" onClick={handleLogout}>
-          <LogOut className="w-4 h-4" /> Sign out
+      <div className="flex items-center gap-3 text-sm">
+        <span className="font-semibold text-gray-900">{session.displayName}</span>
+        <span className="text-xs font-bold uppercase text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full">
+          {session.division}
+        </span>
+        <span className="text-xs font-bold uppercase text-gray-600">({roleLabel(session.role)})</span>
+        <DashButton variant="ghost" size="sm" onClick={handleLogout}>
+          Log out
         </DashButton>
       </div>
     );
@@ -59,25 +58,32 @@ export function ChatLoginBar({
 
   return (
     <SurfaceCard className="p-4 mb-6">
-      <p className="text-sm font-bold text-gray-900 mb-1">Sign in to use package discussions</p>
-      <p className="text-xs text-gray-600 mb-3">Admins use fulfillment@fromthisisland.com · Marketing uses your team email.</p>
-      <form onSubmit={handleLogin} className="flex flex-wrap gap-2 items-end">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          className={`${fieldInput} max-w-xs`}
-        />
-        <input
-          type="password"
-          required
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="PIN"
-          className={`${fieldInput} max-w-[120px]`}
-        />
+      <p className="text-xs font-bold uppercase text-gray-700 mb-2">Sign in for chat &amp; registry edits</p>
+      <p className="text-xs text-gray-600 mb-3">
+        Fulfillment and admin accounts use fulfillment@fromthisisland.com · Requesters use your team email.
+      </p>
+      <form onSubmit={handleLogin} className="flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={fieldInput}
+            placeholder="you@fromthisisland.com"
+          />
+        </div>
+        <div className="w-24">
+          <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">PIN</label>
+          <input
+            type="password"
+            required
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            className={fieldInput}
+          />
+        </div>
         <DashButton type="submit" variant="primary" size="md" disabled={loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
         </DashButton>

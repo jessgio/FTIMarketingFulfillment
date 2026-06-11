@@ -33,6 +33,7 @@ import {
   deleteMarketingRequest,
   fetchMarketingRequestPurposes,
   fetchMarketingRequestsByUser,
+  fetchAllMarketingRequestsForRegistry,
   loginMarketingUser,
   searchProducts,
   updateMarketingRequest,
@@ -45,10 +46,12 @@ import {
 import { MarketingChatUnreadBadge } from "../../components/marketing/MarketingChatUnreadBadge";
 import { MarketingDashboard } from "../../components/marketing/MarketingDashboard";
 import { MarketingRequestDetailModal } from "../../components/marketing/MarketingRequestDetailModal";
-import { MarketingShipmentsRegistry } from "../../components/marketing/MarketingShipmentsRegistry";
+import { MarketingPortalShipmentsPanel } from "../../components/marketing/MarketingPortalShipmentsPanel";
+import { MarketingPurposeSummary } from "../../components/marketing/MarketingPurposeSummary";
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
+import { canAccessRequestPortal, roleLabel } from "../../lib/marketingRoles";
 import {
   MARKETING_COURIER_OPTIONS,
   type MarketingCourier,
@@ -102,42 +105,6 @@ function groupRequestsByPurpose(requests: MarketingRequest[]): PurposeGroup[] {
     }));
 }
 
-function MarketingPurposeSummary({
-  groups,
-  totalLabel = "Total requests",
-}: {
-  groups: PurposeGroup[];
-  totalLabel?: string;
-}) {
-  const total = groups.reduce((count, group) => count + group.requests.length, 0);
-
-  return (
-    <SurfaceCard className="p-4 mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="shrink-0">
-          <p className="text-3xl font-black text-gray-900 tabular-nums leading-none">{total}</p>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1.5">{totalLabel}</p>
-        </div>
-        {groups.length > 0 && (
-          <div className="flex flex-wrap gap-2 sm:border-l sm:border-gray-200 sm:pl-4">
-            {groups.map((group) => (
-              <span
-                key={group.purposeKey || "__none__"}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-900 bg-violet-50 border border-violet-100 rounded-full px-3 py-1.5"
-              >
-                <span className="truncate max-w-[200px]" title={group.label}>
-                  {group.label}
-                </span>
-                <span className="font-black tabular-nums text-violet-700">{group.requests.length}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </SurfaceCard>
-  );
-}
-
 export default function MarketingPage() {
   const [session, setSession] = useState<MarketingSession | null>(null);
   const [booting, setBooting] = useState(true);
@@ -148,7 +115,9 @@ export default function MarketingPage() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   const [requests, setRequests] = useState<MarketingRequest[]>([]);
+  const [dashboardRequests, setDashboardRequests] = useState<MarketingRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
 
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
@@ -207,15 +176,31 @@ export default function MarketingPage() {
     [session]
   );
 
+  const loadDashboardRequests = useCallback(async (silent = false) => {
+    if (!silent) setLoadingDashboard(true);
+    try {
+      const data = await fetchAllMarketingRequestsForRegistry();
+      setDashboardRequests(data);
+    } catch {
+      if (!silent) setDashboardRequests([]);
+    } finally {
+      if (!silent) setLoadingDashboard(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!session) return;
     void loadRequests();
+    void loadDashboardRequests();
     fetchMarketingRequestPurposes()
       .then(setSavedPurposes)
       .catch(() => setSavedPurposes([]));
-  }, [session, loadRequests]);
+  }, [session, loadRequests, loadDashboardRequests]);
 
-  useAutoRefresh(() => loadRequests(true), 15000, !!session);
+  useAutoRefresh(() => {
+    void loadRequests(true);
+    void loadDashboardRequests(true);
+  }, 15000, !!session);
 
   useEffect(() => {
     if (activeLookupIndex === null) {
@@ -461,16 +446,19 @@ export default function MarketingPage() {
     }
   };
 
-  const shipmentRequests = useMemo(
-    () => requests.filter((req) => req.status !== "cancelled"),
-    [requests]
+  const portalShipmentRequests = useMemo(
+    () => dashboardRequests.filter((req) => req.status !== "cancelled"),
+    [dashboardRequests]
   );
   const requestsByPurpose = useMemo(() => groupRequestsByPurpose(requests), [requests]);
-  const shipmentsByPurpose = useMemo(() => groupRequestsByPurpose(shipmentRequests), [shipmentRequests]);
-  const viewingRequest = useMemo(
-    () => requests.find((req) => req.id === viewingRequestId) ?? null,
-    [requests, viewingRequestId]
-  );
+  const viewingRequest = useMemo(() => {
+    if (!viewingRequestId) return null;
+    return (
+      requests.find((req) => req.id === viewingRequestId) ??
+      dashboardRequests.find((req) => req.id === viewingRequestId) ??
+      null
+    );
+  }, [requests, dashboardRequests, viewingRequestId]);
   const isWidePortal = portalTab === "shipments" || portalTab === "dashboard";
 
   if (booting) {
@@ -489,8 +477,10 @@ export default function MarketingPage() {
             <div className="w-14 h-14 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Package className="w-7 h-7 text-violet-700" />
             </div>
-            <h1 className="text-2xl font-black text-gray-900">Marketing Requests</h1>
-            <p className="text-gray-600 mt-2 text-sm">Sign in with your pre-set team email and PIN.</p>
+            <h1 className="text-2xl font-black text-gray-900">Shipment Requests</h1>
+            <p className="text-gray-600 mt-2 text-sm">
+              Sign in with your team email and PIN. Marketing, R&amp;D, Leadership, and other divisions can submit requests here.
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -502,7 +492,7 @@ export default function MarketingPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={fieldInput}
-                placeholder="marketing@fromthisisland.com"
+                placeholder="you@fromthisisland.com"
               />
             </div>
             <div>
@@ -528,6 +518,27 @@ export default function MarketingPage() {
     );
   }
 
+  if (!canAccessRequestPortal(session)) {
+    return (
+      <CenteredPage>
+        <SurfaceCard className="p-8 w-full max-w-md text-center">
+          <h1 className="text-xl font-black text-gray-900 mb-2">Fulfillment account</h1>
+          <p className="text-sm text-gray-600 mb-6">
+            Your account ({roleLabel(session.role)}) is set up for the packing portal, not submitting requests.
+          </p>
+          <Link href="/marketing/fulfill">
+            <DashButton variant="primary" size="lg">
+              Go to packing portal
+            </DashButton>
+          </Link>
+          <DashButton variant="ghost" size="sm" className="mt-4" onClick={handleLogout}>
+            <LogOut className="w-4 h-4" /> Log out
+          </DashButton>
+        </SurfaceCard>
+      </CenteredPage>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-10">
@@ -538,12 +549,16 @@ export default function MarketingPage() {
           )}
         >
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-violet-600">FTI Marketing</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-violet-600">FTI · {session.division}</p>
             <h1 className="text-xl font-black text-gray-900">Request Goods</h1>
           </div>
           <div className="flex items-center gap-3">
             <MarketingChatUnreadBadge count={totalUnread} />
-            <span className="text-sm text-gray-600 hidden sm:block">{session.displayName}</span>
+            <span className="text-sm text-gray-600 hidden sm:block">
+              {session.displayName}
+              <span className="text-gray-400"> · </span>
+              {session.division}
+            </span>
             <DashButton variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4" /> Log out
             </DashButton>
@@ -588,30 +603,28 @@ export default function MarketingPage() {
             )}
           >
             <List className="w-4 h-4 shrink-0" />
-            Shipments ({shipmentRequests.length})
+            Shipments ({portalShipmentRequests.length})
           </DashButton>
         </div>
 
         {portalTab === "dashboard" ? (
           <MarketingDashboard
-            requests={requests}
-            loading={loadingRequests}
+            requests={dashboardRequests}
+            loading={loadingDashboard}
+            session={session}
             onViewRequest={setViewingRequestId}
           />
         ) : portalTab === "shipments" ? (
-          <>
-            {shipmentRequests.length > 0 && (
-              <MarketingPurposeSummary groups={shipmentsByPurpose} totalLabel="Total shipments" />
-            )}
-            <MarketingShipmentsRegistry
-              requests={shipmentRequests}
-              session={session}
-              onViewRequest={setViewingRequestId}
-              onUpdated={() => loadRequests(true)}
-              variant="portal"
-              live
-            />
-          </>
+          <MarketingPortalShipmentsPanel
+            requests={portalShipmentRequests}
+            loading={loadingDashboard}
+            session={session}
+            onViewRequest={setViewingRequestId}
+            onUpdated={() => {
+              void loadRequests(true);
+              void loadDashboardRequests(true);
+            }}
+          />
         ) : (
         <>
         <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">

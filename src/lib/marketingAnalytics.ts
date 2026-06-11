@@ -25,11 +25,19 @@ export interface MarketingTrendBucket {
   items: number;
 }
 
+export interface MarketingPurposeRequesterStat {
+  name: string;
+  email: string;
+  requests: number;
+  items: number;
+}
+
 export interface MarketingPurposeStat {
   label: string;
   purposeKey: string;
   requests: number;
   items: number;
+  byRequester?: MarketingPurposeRequesterStat[];
 }
 
 export interface MarketingProductStat {
@@ -122,7 +130,51 @@ function purposeLabel(purpose: string | null | undefined): string {
   return trimmed || "No purpose assigned";
 }
 
-export function buildMarketingDashboardStats(requests: MarketingRequest[]): MarketingDashboardStats {
+function purposeKeyFromRequest(req: MarketingRequest): string {
+  return req.request_purpose?.trim() || "";
+}
+
+function attachRequesterBreakdown(
+  requests: MarketingRequest[],
+  purposeStats: MarketingPurposeStat[]
+): MarketingPurposeStat[] {
+  const requestsByPurpose = new Map<string, MarketingRequest[]>();
+  for (const req of requests) {
+    const key = purposeKeyFromRequest(req);
+    const list = requestsByPurpose.get(key) ?? [];
+    list.push(req);
+    requestsByPurpose.set(key, list);
+  }
+
+  return purposeStats.map((stat) => {
+    const purposeRequests = requestsByPurpose.get(stat.purposeKey) ?? [];
+    const requesterMap = new Map<string, MarketingPurposeRequesterStat>();
+
+    for (const req of purposeRequests) {
+      const email = req.requested_by_email;
+      const entry = requesterMap.get(email) ?? {
+        name: req.requested_by_name,
+        email,
+        requests: 0,
+        items: 0,
+      };
+      entry.requests++;
+      entry.items += countItems(req);
+      requesterMap.set(email, entry);
+    }
+
+    const byRequester = [...requesterMap.values()].sort(
+      (a, b) => b.requests - a.requests || a.name.localeCompare(b.name)
+    );
+
+    return byRequester.length > 0 ? { ...stat, byRequester } : stat;
+  });
+}
+
+export function buildMarketingDashboardStats(
+  requests: MarketingRequest[],
+  options?: { includeRequesterBreakdown?: boolean }
+): MarketingDashboardStats {
   const now = new Date();
   const weekStart = startOfWeek(now);
   const nextWeekStart = addDays(weekStart, 7);
@@ -229,6 +281,10 @@ export function buildMarketingDashboardStats(requests: MarketingRequest[]): Mark
   }
 
   const requestCount = requests.length;
+  const byPurposeBase = [...purposeMap.values()].sort((a, b) => b.requests - a.requests);
+  const byPurpose = options?.includeRequesterBreakdown
+    ? attachRequesterBreakdown(requests, byPurposeBase)
+    : byPurposeBase;
 
   return {
     totals: {
@@ -243,7 +299,7 @@ export function buildMarketingDashboardStats(requests: MarketingRequest[]): Mark
       thisMonth: sumPeriod(requests, monthStart, nextMonthStart),
       lastMonth: sumPeriod(requests, lastMonthStart, monthStart),
     },
-    byPurpose: [...purposeMap.values()].sort((a, b) => b.requests - a.requests),
+    byPurpose,
     byCourier: [...courierMap.entries()]
       .map(([courier, count]) => ({ courier, requests: count }))
       .sort((a, b) => b.requests - a.requests),

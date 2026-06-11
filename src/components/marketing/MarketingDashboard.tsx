@@ -1,24 +1,34 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
   CalendarDays,
   ChevronRight,
+  Filter,
   Loader2,
   Package,
   ShoppingBag,
   TrendingUp,
 } from "lucide-react";
 import { SurfaceCard, cx } from "../dashboard/primitives";
+import { MarketingPortalExportBar } from "./MarketingPortalExportBar";
 import {
   buildMarketingDashboardStats,
   formatDelta,
   type MarketingActivityEvent,
   type MarketingTrendBucket,
 } from "../../lib/marketingAnalytics";
-import type { MarketingRequest } from "../../types/marketing";
+import {
+  ALL_FILTER,
+  buildPortalFilterOptions,
+  defaultPortalFilters,
+  filterRequestsForPortal,
+  type PortalExportFilters,
+} from "../../lib/marketingPortalFilters";
+import { downloadMarketingHistoryExport } from "../../lib/marketingExport";
+import type { MarketingRequest, MarketingSession } from "../../types/marketing";
 
 const statusStyles: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -130,13 +140,53 @@ function TrendBars({
 export function MarketingDashboard({
   requests,
   loading,
+  session,
   onViewRequest,
 }: {
   requests: MarketingRequest[];
   loading: boolean;
+  session: MarketingSession;
   onViewRequest: (id: string) => void;
 }) {
-  const stats = useMemo(() => buildMarketingDashboardStats(requests), [requests]);
+  const [filters, setFilters] = useState<PortalExportFilters>(() => defaultPortalFilters(session));
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
+  useEffect(() => {
+    if (filtersInitialized) return;
+    setFilters(defaultPortalFilters(session));
+    setFiltersInitialized(true);
+  }, [session, filtersInitialized]);
+
+  const filterOptions = useMemo(() => buildPortalFilterOptions(requests), [requests]);
+
+  const filteredRequests = useMemo(
+    () => filterRequestsForPortal(requests, filters),
+    [requests, filters]
+  );
+
+  const viewingByDivision = filters.division !== ALL_FILTER;
+
+  const stats = useMemo(
+    () =>
+      buildMarketingDashboardStats(filteredRequests, {
+        includeRequesterBreakdown: viewingByDivision,
+      }),
+    [filteredRequests, viewingByDivision]
+  );
+
+  const clearFilters = () => {
+    setFilters({
+      division: ALL_FILTER,
+      user: ALL_FILTER,
+      purpose: ALL_FILTER,
+      dateFrom: "",
+      dateTo: "",
+    });
+  };
+
+  const handleExport = () => {
+    downloadMarketingHistoryExport(filteredRequests);
+  };
 
   if (loading) {
     return (
@@ -158,11 +208,48 @@ export function MarketingDashboard({
     );
   }
 
+  if (filteredRequests.length === 0) {
+    return (
+      <div className="space-y-6">
+        <MarketingPortalExportBar
+          filters={filters}
+          filterOptions={filterOptions}
+          filteredCount={filteredRequests.length}
+          selectedCount={0}
+          onFiltersChange={setFilters}
+          onClearFilters={clearFilters}
+          onExport={handleExport}
+        />
+        <SurfaceCard className="p-12 text-center">
+          <Filter className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+          <p className="font-semibold text-gray-800">No shipments match these filters</p>
+          <p className="text-sm text-gray-600 mt-2">Try widening division, user, or purpose.</p>
+        </SurfaceCard>
+      </div>
+    );
+  }
+
   const { totals, periods, byPurpose, byCourier, weeklyTrend, monthlyTrend, topProducts, recentActivity } =
     stats;
 
   return (
     <div className="space-y-6">
+      <MarketingPortalExportBar
+        filters={filters}
+        filterOptions={filterOptions}
+        filteredCount={filteredRequests.length}
+        selectedCount={0}
+        onFiltersChange={setFilters}
+        onClearFilters={clearFilters}
+        onExport={handleExport}
+      />
+
+      {viewingByDivision && (
+        <p className="text-xs text-violet-800 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          Viewing <span className="font-bold">{filters.division}</span> — requester totals appear under each purpose below.
+        </p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="All-time shipments" value={totals.requests} sub={`${totals.items} items ordered`} />
         <StatCard
@@ -240,13 +327,35 @@ export function MarketingDashboard({
               </thead>
               <tbody>
                 {byPurpose.map((row) => (
-                  <tr key={row.purposeKey || "__none__"} className="border-t border-gray-100">
-                    <td className="py-2.5 pr-3 font-medium text-violet-900 max-w-[220px] truncate" title={row.label}>
-                      {row.label}
-                    </td>
-                    <td className="py-2.5 pr-3 text-right font-bold tabular-nums">{row.requests}</td>
-                    <td className="py-2.5 text-right font-bold tabular-nums text-gray-700">{row.items}</td>
-                  </tr>
+                  <Fragment key={row.purposeKey || "__none__"}>
+                    <tr className="border-t border-gray-100">
+                      <td className="py-2.5 pr-3 font-medium text-violet-900 max-w-[220px] truncate" title={row.label}>
+                        {row.label}
+                      </td>
+                      <td className="py-2.5 pr-3 text-right font-bold tabular-nums">{row.requests}</td>
+                      <td className="py-2.5 text-right font-bold tabular-nums text-gray-700">{row.items}</td>
+                    </tr>
+                    {viewingByDivision &&
+                      row.byRequester?.map((requester) => (
+                        <tr
+                          key={`${row.purposeKey}:${requester.email}`}
+                          className="border-t border-gray-50 bg-gray-50/60"
+                        >
+                          <td className="py-2 pl-6 pr-3 text-sm text-gray-700">
+                            <span className="text-gray-400 mr-2" aria-hidden="true">
+                              └
+                            </span>
+                            {requester.name}
+                          </td>
+                          <td className="py-2 pr-3 text-right text-sm font-semibold tabular-nums text-gray-700">
+                            {requester.requests}
+                          </td>
+                          <td className="py-2 text-right text-sm font-semibold tabular-nums text-gray-600">
+                            {requester.items}
+                          </td>
+                        </tr>
+                      ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

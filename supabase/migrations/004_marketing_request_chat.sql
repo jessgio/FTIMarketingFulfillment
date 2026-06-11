@@ -8,8 +8,8 @@ comment on column marketing_users.role is 'marketing = requesters; admin = fulfi
 
 update marketing_users set role = 'marketing' where role is null;
 
-insert into marketing_users (email, display_name, pin, role) values
-  ('fulfillment@fromthisisland.com', 'Fulfillment Admin', '5910', 'admin')
+insert into marketing_users (email, display_name, pin, role, division) values
+  ('fulfillment@fromthisisland.com', 'Fulfillment Admin', '5910', 'admin', 'Operations')
 on conflict (email) do update set role = 'admin', active = true;
 
 create table if not exists marketing_request_messages (
