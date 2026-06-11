@@ -3,7 +3,7 @@ import { generateMarketingBarcode } from "./marketingBarcode";
 import { assertSupabaseConfigured } from "./supabaseConfig";
 import { getSupabaseErrorMessage } from "./supabaseError";
 import { normalizeRequesterDivision } from "./marketingAuth";
-import { canFulfill, isAdmin, normalizeUserRole } from "./marketingRoles";
+import { canAccessRequestPortal, canFulfill, isAdmin, normalizeUserRole } from "./marketingRoles";
 import type {
   MarketingRequest,
   MarketingSession,
@@ -67,6 +67,27 @@ export async function fetchMarketingRequestPurposes(): Promise<string[]> {
 
   if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to load saved purposes"));
   return (data ?? []).map((row) => row.label);
+}
+
+export async function deleteMarketingRequestPurpose(
+  session: MarketingSession,
+  label: string
+): Promise<void> {
+  if (!canAccessRequestPortal(session)) {
+    throw new Error("You do not have permission to manage saved purposes.");
+  }
+
+  const trimmed = label.trim();
+  if (!trimmed) throw new Error("Purpose label is required.");
+
+  const { data, error } = await supabase
+    .from("marketing_request_purposes")
+    .delete()
+    .eq("label", trimmed)
+    .select("label");
+
+  if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to delete saved purpose"));
+  if (!data?.length) throw new Error("Saved purpose not found.");
 }
 
 export async function loginMarketingUser(

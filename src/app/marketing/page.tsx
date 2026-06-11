@@ -32,6 +32,7 @@ import {
   createMarketingRequest,
   createMarketingRequestsBulk,
   deleteMarketingRequest,
+  deleteMarketingRequestPurpose,
   fetchMarketingRequestById,
   fetchMarketingRequestPurposes,
   fetchMarketingRequestsByUser,
@@ -53,6 +54,7 @@ import { MarketingPortalShipmentsPanel } from "../../components/marketing/Market
 import { MarketingSummaryPanel } from "../../components/marketing/MarketingSummaryPanel";
 import { MarketingAddressFields } from "../../components/marketing/MarketingAddressFields";
 import { MarketingPurposeSummary } from "../../components/marketing/MarketingPurposeSummary";
+import { MarketingSavedPurposesField } from "../../components/marketing/MarketingSavedPurposesField";
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
@@ -148,6 +150,7 @@ function MarketingPageContent() {
   const [notes, setNotes] = useState("");
   const [requestPurpose, setRequestPurpose] = useState("");
   const [savedPurposes, setSavedPurposes] = useState<string[]>([]);
+  const [deletingPurpose, setDeletingPurpose] = useState<string | null>(null);
   const [items, setItems] = useState<DraftItem[]>([{ product_barcode: "", product_name: "", qty: 1 }]);
 
   const [activeLookupIndex, setActiveLookupIndex] = useState<number | null>(null);
@@ -376,6 +379,26 @@ function MarketingPageContent() {
         : [{ product_barcode: "", product_name: "", qty: 1 }]
     );
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteSavedPurpose = async (purpose: string) => {
+    if (!session) return;
+    const confirmed = window.confirm(
+      `Remove "${purpose}" from saved events and purposes?\n\nExisting shipments keep this label; it will only be removed from the saved list.`
+    );
+    if (!confirmed) return;
+
+    setDeletingPurpose(purpose);
+    setSubmitError("");
+    try {
+      await deleteMarketingRequestPurpose(session, purpose);
+      setSavedPurposes((prev) => prev.filter((entry) => entry !== purpose));
+      if (requestPurpose === purpose) setRequestPurpose("");
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to delete saved purpose");
+    } finally {
+      setDeletingPurpose(null);
+    }
   };
 
   const handleDeleteRequest = async (req: MarketingRequest) => {
@@ -888,44 +911,14 @@ function MarketingPageContent() {
             <section>
               <h3 className="text-xs font-bold uppercase text-gray-700 mb-1">Event / purpose</h3>
               <p className="text-xs text-gray-500 mb-3">Internal only — not printed on shipping labels.</p>
-              <div className="grid gap-3">
-                {savedPurposes.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Recent purposes</label>
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value) setRequestPurpose(e.target.value);
-                      }}
-                      className={fieldInput}
-                    >
-                      <option value="">Select a saved event or purpose…</option>
-                      {savedPurposes.map((purpose) => (
-                        <option key={purpose} value={purpose}>
-                          {purpose}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    {savedPurposes.length > 0 ? "Or enter event / purpose" : "Event / purpose"}
-                  </label>
-                  <input
-                    value={requestPurpose}
-                    onChange={(e) => setRequestPurpose(e.target.value)}
-                    placeholder="e.g. TikTok creator seeding — Q2 launch"
-                    list="marketing-purpose-suggestions"
-                    className={fieldInput}
-                  />
-                  <datalist id="marketing-purpose-suggestions">
-                    {savedPurposes.map((purpose) => (
-                      <option key={purpose} value={purpose} />
-                    ))}
-                  </datalist>
-                </div>
-              </div>
+              <MarketingSavedPurposesField
+                savedPurposes={savedPurposes}
+                value={requestPurpose}
+                onChange={setRequestPurpose}
+                onDelete={handleDeleteSavedPurpose}
+                deletingPurpose={deletingPurpose}
+                fieldInputClass={fieldInput}
+              />
             </section>
 
             <section>
