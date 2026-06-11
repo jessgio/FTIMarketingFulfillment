@@ -75,6 +75,16 @@ function playBeep(ok: boolean) {
   }
 }
 
+function isFormFieldFocused(): boolean {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement ||
+    active instanceof HTMLSelectElement ||
+    (active instanceof HTMLElement && active.isContentEditable)
+  );
+}
+
 export default function MarketingFulfillPage() {
   const [moduleTab, setModuleTab] = useState<"ACTIVE" | "HISTORY" | "SHIPMENTS">("ACTIVE");
   const [requests, setRequests] = useState<MarketingRequest[]>([]);
@@ -171,12 +181,17 @@ export default function MarketingFulfillPage() {
     setViewingRequestId(null);
   }, [moduleTab]);
 
+  const focusScanIfIdle = useCallback(() => {
+    if (moduleTab !== "ACTIVE" || isFormFieldFocused()) return;
+    scanRef.current?.focus();
+  }, [moduleTab]);
+
   useEffect(() => {
-    const focus = () => scanRef.current?.focus();
-    focus();
-    const interval = setInterval(focus, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    focusScanIfIdle();
+    const onWindowFocus = () => focusScanIfIdle();
+    window.addEventListener("focus", onWindowFocus);
+    return () => window.removeEventListener("focus", onWindowFocus);
+  }, [focusScanIfIdle]);
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +245,8 @@ export default function MarketingFulfillPage() {
       setScanOk(false);
       setScanMessage(err instanceof Error ? err.message : "Scan failed");
       playBeep(false);
+    } finally {
+      focusScanIfIdle();
     }
   };
 
