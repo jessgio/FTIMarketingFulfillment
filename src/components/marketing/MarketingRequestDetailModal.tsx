@@ -40,6 +40,7 @@ export function MarketingRequestDetailModal({
   onRead,
   onDelete,
   deleting = false,
+  defaultChatOpen = false,
 }: {
   request: MarketingRequest;
   onClose: () => void;
@@ -48,6 +49,7 @@ export function MarketingRequestDetailModal({
   onRead?: () => void;
   onDelete?: () => void;
   deleting?: boolean;
+  defaultChatOpen?: boolean;
 }) {
   return (
     <div
@@ -178,6 +180,7 @@ export function MarketingRequestDetailModal({
             requestId={request.id}
             packageLabel={`${request.recipient_name} · ${request.barcode}`}
             session={session}
+            defaultOpen={defaultChatOpen}
             unreadCount={unreadCount}
             onRead={onRead}
           />

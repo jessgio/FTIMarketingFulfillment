@@ -48,7 +48,7 @@ export function buildMentionLarkText(opts: {
     "",
     messagePlain.trim(),
     "",
-    `Open package: ${packageUrl}`,
+    `Open thread: ${packageUrl}`,
   ]
     .filter((row, i, arr) => row !== "" || (i > 0 && arr[i - 1] !== ""))
     .join("\n")

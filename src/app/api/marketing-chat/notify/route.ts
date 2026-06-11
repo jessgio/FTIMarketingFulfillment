@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { getAppOrigin } from "../../../../lib/app-origin";
 import { isLarkConfigured, sendLarkText } from "../../../../lib/lark";
 import { buildMentionLarkText } from "../../../../lib/lark-messages";
+import { buildMarketingThreadUrl } from "../../../../lib/marketingDeepLinks";
 import { supabase } from "../../../../lib/supabaseClient";
 import { mentionHandleFromEmail, parseMentionedEmails } from "../../../../lib/marketingMentions";
 import { canFulfill, normalizeUserRole } from "../../../../lib/marketingRoles";
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
     let larkError: string | undefined;
     if (mentionedEmails.length > 0 && larkConfigured) {
       const origin = getAppOrigin(new URL(request.url).origin);
-      const packageUrl = `${origin}/marketing/fulfill`;
+      const threadUrl = buildMarketingThreadUrl(origin, message.request_id);
       const larkText = buildMentionLarkText({
         barcode: pkg.barcode,
         recipientName: pkg.recipient_name,
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
         authorName: message.author_name,
         mentionedHandles,
         messagePlain: message.body,
-        packageUrl,
+        packageUrl: threadUrl,
       });
       const larkResult = await sendLarkText(larkText, { webhookKind: "chat" });
       if (!larkResult.ok) {

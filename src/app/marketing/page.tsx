@@ -32,6 +32,7 @@ import {
   createMarketingRequest,
   createMarketingRequestsBulk,
   deleteMarketingRequest,
+  fetchMarketingRequestById,
   fetchMarketingRequestPurposes,
   fetchMarketingRequestsByUser,
   fetchAllMarketingRequestsForRegistry,
@@ -55,6 +56,7 @@ import { MarketingPurposeSummary } from "../../components/marketing/MarketingPur
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
+import { useMarketingRequestDeepLink } from "../../hooks/useMarketingRequestDeepLink";
 import { buildPortalShipmentRequests } from "../../lib/marketingPortalFilters";
 import { canAccessRequestPortal, roleLabel } from "../../lib/marketingRoles";
 import {
@@ -157,8 +159,20 @@ export default function MarketingPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [portalTab, setPortalTab] = useState<"dashboard" | "submit" | "shipments" | "summary">("dashboard");
   const [viewingRequestId, setViewingRequestId] = useState<string | null>(null);
+  const [deepLinkChatOpen, setDeepLinkChatOpen] = useState(false);
+  const [deepLinkedRequest, setDeepLinkedRequest] = useState<MarketingRequest | null>(null);
 
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(session);
+
+  const handleRequestDeepLink = useCallback((requestId: string, openChat: boolean) => {
+    setViewingRequestId(requestId);
+    setDeepLinkChatOpen(openChat);
+    void fetchMarketingRequestById(requestId).then((req) => {
+      if (req) setDeepLinkedRequest(req);
+    });
+  }, []);
+
+  useMarketingRequestDeepLink(handleRequestDeepLink, !booting);
 
   useEffect(() => {
     const stored = getMarketingSession();
@@ -479,9 +493,9 @@ export default function MarketingPage() {
     return (
       requests.find((req) => req.id === viewingRequestId) ??
       dashboardRequests.find((req) => req.id === viewingRequestId) ??
-      null
+      (deepLinkedRequest?.id === viewingRequestId ? deepLinkedRequest : null)
     );
-  }, [requests, dashboardRequests, viewingRequestId]);
+  }, [requests, dashboardRequests, viewingRequestId, deepLinkedRequest]);
   const isWidePortal =
     portalTab === "shipments" || portalTab === "dashboard" || portalTab === "summary";
   const portalMaxWidth = isWidePortal ? "max-w-7xl" : "max-w-3xl";
@@ -1155,8 +1169,13 @@ export default function MarketingPage() {
       {viewingRequest && (
         <MarketingRequestDetailModal
           request={viewingRequest}
-          onClose={() => setViewingRequestId(null)}
+          onClose={() => {
+            setViewingRequestId(null);
+            setDeepLinkChatOpen(false);
+            setDeepLinkedRequest(null);
+          }}
           session={session}
+          defaultChatOpen={deepLinkChatOpen}
           unreadCount={unreadByRequestId[viewingRequest.id] ?? 0}
           onRead={refreshUnread}
         />
