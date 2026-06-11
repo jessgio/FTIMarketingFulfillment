@@ -6,13 +6,12 @@ export interface PortalExportFilters {
   division: string;
   user: string;
   purpose: string;
+  status: MarketingRequestStatus | typeof ALL_FILTER;
   dateFrom: string;
   dateTo: string;
 }
 
-export interface SummaryFilters extends PortalExportFilters {
-  status: MarketingRequestStatus | typeof ALL_FILTER;
-}
+export type SummaryFilters = PortalExportFilters;
 
 export const SUMMARY_STATUS_OPTIONS: Array<{ value: MarketingRequestStatus; label: string }> = [
   { value: "pending", label: "Pending" },
@@ -39,6 +38,7 @@ export function defaultPortalFilters(session: MarketingSession): PortalExportFil
     division: session.division,
     user: ALL_FILTER,
     purpose: ALL_FILTER,
+    status: ALL_FILTER,
     dateFrom: "",
     dateTo: "",
   };
@@ -88,12 +88,15 @@ function endOfFilterDay(value: string): number | null {
   return new Date(`${value}T23:59:59.999`).getTime();
 }
 
-function matchesPortalDateAndPurposeFilters(
+function matchesPortalDatePurposeAndStatusFilters(
   req: MarketingRequest,
   filters: PortalExportFilters,
   fromTs: number | null,
   toTs: number | null
 ): boolean {
+  if (filters.status !== ALL_FILTER && req.status !== filters.status) {
+    return false;
+  }
   if (filters.purpose !== ALL_FILTER && purposeKeyFromRequest(req) !== filters.purpose) {
     return false;
   }
@@ -148,7 +151,7 @@ export function filterRequestsForPortal(
     if (filters.user !== ALL_FILTER && req.requested_by_email !== filters.user) {
       return false;
     }
-    return matchesPortalDateAndPurposeFilters(req, filters, fromTs, toTs);
+    return matchesPortalDatePurposeAndStatusFilters(req, filters, fromTs, toTs);
   });
 }
 
@@ -168,7 +171,7 @@ export function filterPortalShipmentRequests(
     if (filters.user !== ALL_FILTER && req.requested_by_email !== filters.user) {
       return false;
     }
-    if (!matchesPortalDateAndPurposeFilters(req, filters, fromTs, toTs)) {
+    if (!matchesPortalDatePurposeAndStatusFilters(req, filters, fromTs, toTs)) {
       return false;
     }
     if (isOwn) {
@@ -186,6 +189,7 @@ export function hasActivePortalFilters(filters: PortalExportFilters): boolean {
     filters.division !== ALL_FILTER ||
     filters.user !== ALL_FILTER ||
     filters.purpose !== ALL_FILTER ||
+    filters.status !== ALL_FILTER ||
     Boolean(filters.dateFrom) ||
     Boolean(filters.dateTo)
   );
@@ -195,23 +199,9 @@ export function filterRequestsForSummary(
   requests: MarketingRequest[],
   filters: SummaryFilters
 ): MarketingRequest[] {
-  const fromTs = startOfFilterDay(filters.dateFrom);
-  const toTs = endOfFilterDay(filters.dateTo);
-
-  return requests.filter((req) => {
-    if (filters.division !== ALL_FILTER && divisionLabel(req.requested_by_division) !== filters.division) {
-      return false;
-    }
-    if (filters.user !== ALL_FILTER && req.requested_by_email !== filters.user) {
-      return false;
-    }
-    if (filters.status !== ALL_FILTER && req.status !== filters.status) {
-      return false;
-    }
-    return matchesPortalDateAndPurposeFilters(req, filters, fromTs, toTs);
-  });
+  return filterRequestsForPortal(requests, filters);
 }
 
 export function hasActiveSummaryFilters(filters: SummaryFilters): boolean {
-  return hasActivePortalFilters(filters) || filters.status !== ALL_FILTER;
+  return hasActivePortalFilters(filters);
 }

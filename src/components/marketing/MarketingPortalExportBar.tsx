@@ -4,6 +4,7 @@ import { Download, Filter } from "lucide-react";
 import { DashButton, SurfaceCard, fieldInput } from "../dashboard/primitives";
 import {
   ALL_FILTER,
+  SUMMARY_STATUS_OPTIONS,
   type PortalExportFilters,
   hasActivePortalFilters,
 } from "../../lib/marketingPortalFilters";
@@ -17,6 +18,7 @@ export function MarketingPortalExportBar({
   onClearFilters,
   onExport,
   showDateFilters = true,
+  showStatusFilter = true,
 }: {
   filters: PortalExportFilters;
   filterOptions: {
@@ -30,10 +32,18 @@ export function MarketingPortalExportBar({
   onClearFilters: () => void;
   onExport: () => void;
   showDateFilters?: boolean;
+  showStatusFilter?: boolean;
 }) {
   const exportCount = selectedCount > 0 ? selectedCount : filteredCount;
   const activeFilters = hasActivePortalFilters(filters);
-  const filterColumnCount = showDateFilters ? 5 : 3;
+  const filterFieldCount =
+    3 + (showStatusFilter ? 1 : 0) + (showDateFilters ? 2 : 0);
+  const filterGridClass =
+    filterFieldCount >= 6
+      ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      : filterFieldCount >= 4
+        ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
     <SurfaceCard className="p-4 space-y-4">
@@ -42,13 +52,7 @@ export function MarketingPortalExportBar({
         <span className="text-xs font-bold uppercase tracking-wide">Filter &amp; export</span>
       </div>
 
-      <div
-        className={
-          filterColumnCount === 5
-            ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-            : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        }
-      >
+      <div className={filterGridClass}>
         <div className="min-w-0">
           <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">Division</label>
           <select
@@ -94,6 +98,28 @@ export function MarketingPortalExportBar({
             ))}
           </select>
         </div>
+        {showStatusFilter && (
+          <div className="min-w-0">
+            <label className="block text-[10px] font-bold uppercase text-gray-600 mb-1">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) =>
+                onFiltersChange({
+                  ...filters,
+                  status: e.target.value as PortalExportFilters["status"],
+                })
+              }
+              className={fieldInput}
+            >
+              <option value={ALL_FILTER}>All statuses</option>
+              {SUMMARY_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {showDateFilters && (
           <>
             <div className="min-w-0">

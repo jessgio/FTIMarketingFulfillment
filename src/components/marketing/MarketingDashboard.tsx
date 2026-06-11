@@ -279,6 +279,7 @@ export function MarketingDashboard({
       division: ALL_FILTER,
       user: ALL_FILTER,
       purpose: ALL_FILTER,
+      status: ALL_FILTER,
       dateFrom: "",
       dateTo: "",
     });
