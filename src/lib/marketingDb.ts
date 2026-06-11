@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 import { generateMarketingBarcode } from "./marketingBarcode";
 import { assertSupabaseConfigured } from "./supabaseConfig";
 import { getSupabaseErrorMessage } from "./supabaseError";
+import { normalizeRequesterDivision } from "./marketingAuth";
 import { canFulfill, isAdmin, normalizeUserRole } from "./marketingRoles";
 import type {
   MarketingRequest,
@@ -21,6 +22,40 @@ async function rememberMarketingRequestPurpose(purpose: string | null): Promise<
     { label: purpose, last_used_at: new Date().toISOString() },
     { onConflict: "label" }
   );
+}
+
+async function resolveRequesterDivisionForSubmit(session: MarketingSession): Promise<RequesterDivision> {
+  const { data, error } = await supabase
+    .from("marketing_users")
+    .select("division")
+    .eq("email", session.email)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (!error && data?.division?.trim()) {
+    return normalizeRequesterDivision(data.division);
+  }
+  return normalizeRequesterDivision(session.division);
+}
+
+export async function refreshMarketingSession(
+  session: MarketingSession
+): Promise<MarketingSession> {
+  const { data, error } = await supabase
+    .from("marketing_users")
+    .select("email, display_name, role, division, active")
+    .eq("email", session.email)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error || !data) return session;
+
+  return {
+    email: data.email,
+    displayName: data.display_name,
+    role: normalizeUserRole(data.role),
+    division: normalizeRequesterDivision(data.division),
+  };
 }
 
 export async function fetchMarketingRequestPurposes(): Promise<string[]> {
@@ -53,7 +88,7 @@ export async function loginMarketingUser(
   }
 
   const role = normalizeUserRole(data.role);
-  const division = (data.division?.trim() || "Other") as RequesterDivision;
+  const division = normalizeRequesterDivision(data.division);
 
   return {
     email: data.email,
@@ -71,6 +106,7 @@ export async function createMarketingRequest(
 
   const barcode = generateMarketingBarcode();
   const requestPurpose = normalizeRequestPurpose(input.request_purpose);
+  const requesterDivision = await resolveRequesterDivisionForSubmit(session);
 
   const { data: request, error: requestError } = await supabase
     .from("marketing_requests")
@@ -79,7 +115,7 @@ export async function createMarketingRequest(
       status: "pending",
       requested_by_email: session.email,
       requested_by_name: session.displayName,
-      requested_by_division: session.division,
+      requested_by_division: requesterDivision,
       recipient_name: input.recipient_name.trim(),
       recipient_phone: input.recipient_phone.trim(),
       due_date: input.due_date,

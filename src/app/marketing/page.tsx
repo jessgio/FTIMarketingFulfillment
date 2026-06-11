@@ -36,6 +36,7 @@ import {
   fetchMarketingRequestsByUser,
   fetchAllMarketingRequestsForRegistry,
   loginMarketingUser,
+  refreshMarketingSession,
   searchProducts,
   updateMarketingRequest,
 } from "../../lib/marketingDb";
@@ -159,8 +160,22 @@ export default function MarketingPage() {
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(session);
 
   useEffect(() => {
-    setSession(getMarketingSession());
-    setBooting(false);
+    const stored = getMarketingSession();
+    if (!stored) {
+      setBooting(false);
+      return;
+    }
+    void refreshMarketingSession(stored)
+      .then((refreshed) => {
+        setMarketingSession(refreshed);
+        setSession(refreshed);
+      })
+      .catch(() => {
+        setSession(stored);
+      })
+      .finally(() => {
+        setBooting(false);
+      });
   }, []);
 
   const loadRequests = useCallback(

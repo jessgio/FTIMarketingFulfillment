@@ -3,7 +3,7 @@ import { normalizeUserRole } from "./marketingRoles";
 
 const SESSION_KEY = "fti_marketing_session";
 
-function normalizeDivision(value: string | null | undefined): RequesterDivision {
+export function normalizeRequesterDivision(value: string | null | undefined): RequesterDivision {
   const trimmed = value?.trim();
   if (trimmed === "Marketing" || trimmed === "R&D" || trimmed === "Leadership" || trimmed === "Operations") {
     return trimmed;
@@ -22,7 +22,7 @@ export function getMarketingSession(): MarketingSession | null {
       email: parsed.email,
       displayName: parsed.displayName,
       role: normalizeUserRole(parsed.role),
-      division: normalizeDivision(parsed.division),
+      division: normalizeRequesterDivision(parsed.division),
     };
   } catch {
     return null;
