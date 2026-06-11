@@ -257,6 +257,11 @@ export default function MarketingFulfillPage() {
     }
     try {
       await markMarketingRequestShipped(id, packerName);
+      fetch("/api/marketing-status/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: id }),
+      }).catch((err) => console.warn("Lark shipped notify failed:", err));
       await loadQueue();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to update status");

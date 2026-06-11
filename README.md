@@ -42,5 +42,8 @@ npm run dev
 |----------|----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase API URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `NEXT_PUBLIC_SITE_URL` | For emails | Public app URL in notification links |
+| `NEXT_PUBLIC_SITE_URL` | For emails / Lark | Public app URL in notification links |
 | `RESEND_API_KEY` | For chat emails | Resend API key |
+| `LARK_WEBHOOK_URL` | For Lark | Custom bot webhook for chat mentions (`@handle`) |
+| `LARK_ALERTS_WEBHOOK_URL` | Optional | Separate webhook for shipped alerts; falls back to `LARK_WEBHOOK_URL` |
+| `LARK_WEBHOOK_SECRET` | Optional | HMAC signature for Lark webhooks |

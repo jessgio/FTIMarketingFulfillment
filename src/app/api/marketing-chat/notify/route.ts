@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { getAppOrigin } from "../../../../lib/app-origin";
+import { isLarkConfigured, sendLarkText } from "../../../../lib/lark";
+import { buildMentionLarkText } from "../../../../lib/lark-messages";
 import { supabase } from "../../../../lib/supabaseClient";
 import { mentionHandleFromEmail, parseMentionedEmails } from "../../../../lib/marketingMentions";
 import { canFulfill, normalizeUserRole } from "../../../../lib/marketingRoles";
@@ -10,11 +13,14 @@ function normalizeEmail(email: string): string {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.RESEND_API_KEY) {
-    return NextResponse.json({ error: "Email service not configured" }, { status: 503 });
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY);
+  const larkConfigured = isLarkConfigured("chat");
+
+  if (!resendConfigured && !larkConfigured) {
+    return NextResponse.json({ error: "Notification service not configured" }, { status: 503 });
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const resend = resendConfigured ? new Resend(process.env.RESEND_API_KEY) : null;
 
   try {
     const { messageId } = (await request.json()) as { messageId?: string };
@@ -60,9 +66,16 @@ export async function POST(request: Request) {
 
     const authorEmail = normalizeEmail(message.author_email);
     const requesterEmail = normalizeEmail(pkg.requested_by_email);
-    const mentionedEmails = parseMentionedEmails(message.body, participants, message.author_email).map(
-      normalizeEmail
+    const mentionedEmailsRaw = parseMentionedEmails(
+      message.body,
+      participants,
+      message.author_email
     );
+    const mentionedEmails = mentionedEmailsRaw.map(normalizeEmail);
+    const mentionedHandles = mentionedEmailsRaw.map((email) => {
+      const participant = participants.find((p) => normalizeEmail(p.email) === normalizeEmail(email));
+      return participant?.handle ?? mentionHandleFromEmail(email);
+    });
 
     const recipients = new Set<string>();
 
@@ -76,11 +89,32 @@ export async function POST(request: Request) {
       }
     }
 
-    if (recipients.size === 0) {
-      return NextResponse.json({ success: true, emailed: 0 });
+    let larkError: string | undefined;
+    if (mentionedEmails.length > 0 && larkConfigured) {
+      const origin = getAppOrigin(new URL(request.url).origin);
+      const packageUrl = `${origin}/marketing/fulfill`;
+      const larkText = buildMentionLarkText({
+        barcode: pkg.barcode,
+        recipientName: pkg.recipient_name,
+        status: pkg.status,
+        requestedByName: pkg.requested_by_name,
+        authorName: message.author_name,
+        mentionedHandles,
+        messagePlain: message.body,
+        packageUrl,
+      });
+      const larkResult = await sendLarkText(larkText, { webhookKind: "chat" });
+      if (!larkResult.ok) {
+        console.error("Lark mention notify failed:", larkResult.error);
+        larkError = larkResult.error;
+      }
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    if (recipients.size === 0 || !resend) {
+      return NextResponse.json({ success: true, emailed: 0, larkError });
+    }
+
+    const siteUrl = getAppOrigin(new URL(request.url).origin);
     const marketingUrl = `${siteUrl}/marketing`;
     const fulfillUrl = `${siteUrl}/marketing/fulfill`;
 
@@ -119,7 +153,7 @@ export async function POST(request: Request) {
 
       const text = [intro, "", packageBlock, "", `Open the dashboard to reply: ${openUrl}`].join("\n");
 
-      await resend.emails.send({
+      await resend!.emails.send({
         from: "FTI Fulfillment <fulfillment@fromthisisland.com>",
         to: [to],
         subject,
@@ -128,7 +162,7 @@ export async function POST(request: Request) {
       emailed += 1;
     }
 
-    return NextResponse.json({ success: true, emailed });
+    return NextResponse.json({ success: true, emailed, larkError });
   } catch (err: unknown) {
     console.error("marketing-chat notify error:", err);
     return NextResponse.json(
