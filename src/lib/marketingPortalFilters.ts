@@ -1,4 +1,4 @@
-import type { MarketingRequest, MarketingSession } from "../types/marketing";
+import type { MarketingRequest, MarketingRequestStatus, MarketingSession } from "../types/marketing";
 
 export const ALL_FILTER = "__all__";
 
@@ -9,6 +9,17 @@ export interface PortalExportFilters {
   dateFrom: string;
   dateTo: string;
 }
+
+export interface SummaryFilters extends PortalExportFilters {
+  status: MarketingRequestStatus | typeof ALL_FILTER;
+}
+
+export const SUMMARY_STATUS_OPTIONS: Array<{ value: MarketingRequestStatus; label: string }> = [
+  { value: "pending", label: "Pending" },
+  { value: "packed", label: "Packed" },
+  { value: "shipped", label: "Shipped" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 export function divisionLabel(value: string | null | undefined): string {
   const trimmed = value?.trim();
@@ -28,6 +39,17 @@ export function defaultPortalFilters(session: MarketingSession): PortalExportFil
     division: session.division,
     user: ALL_FILTER,
     purpose: ALL_FILTER,
+    dateFrom: "",
+    dateTo: "",
+  };
+}
+
+export function defaultSummaryFilters(): SummaryFilters {
+  return {
+    division: ALL_FILTER,
+    user: ALL_FILTER,
+    purpose: ALL_FILTER,
+    status: ALL_FILTER,
     dateFrom: "",
     dateTo: "",
   };
@@ -167,4 +189,29 @@ export function hasActivePortalFilters(filters: PortalExportFilters): boolean {
     Boolean(filters.dateFrom) ||
     Boolean(filters.dateTo)
   );
+}
+
+export function filterRequestsForSummary(
+  requests: MarketingRequest[],
+  filters: SummaryFilters
+): MarketingRequest[] {
+  const fromTs = startOfFilterDay(filters.dateFrom);
+  const toTs = endOfFilterDay(filters.dateTo);
+
+  return requests.filter((req) => {
+    if (filters.division !== ALL_FILTER && divisionLabel(req.requested_by_division) !== filters.division) {
+      return false;
+    }
+    if (filters.user !== ALL_FILTER && req.requested_by_email !== filters.user) {
+      return false;
+    }
+    if (filters.status !== ALL_FILTER && req.status !== filters.status) {
+      return false;
+    }
+    return matchesPortalDateAndPurposeFilters(req, filters, fromTs, toTs);
+  });
+}
+
+export function hasActiveSummaryFilters(filters: SummaryFilters): boolean {
+  return hasActivePortalFilters(filters) || filters.status !== ALL_FILTER;
 }

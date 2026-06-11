@@ -327,3 +327,51 @@ export function formatDelta(current: number, previous: number): string {
   if (pct === 0) return "0%";
   return `${pct > 0 ? "+" : ""}${pct}%`;
 }
+
+export type DashboardMetricKey =
+  | "all"
+  | "avg-items"
+  | "this-week"
+  | "this-month"
+  | "pending"
+  | "packed"
+  | "shipped"
+  | "cancelled";
+
+export const DASHBOARD_METRIC_LABELS: Record<DashboardMetricKey, string> = {
+  all: "All-time shipments",
+  "avg-items": "All shipments",
+  "this-week": "This week",
+  "this-month": "This month",
+  pending: "Pending",
+  packed: "Packed",
+  shipped: "Shipped",
+  cancelled: "Cancelled",
+};
+
+export function filterRequestsForDashboardMetric(
+  requests: MarketingRequest[],
+  metric: DashboardMetricKey
+): MarketingRequest[] {
+  if (metric === "pending" || metric === "packed" || metric === "shipped" || metric === "cancelled") {
+    return requests.filter((req) => req.status === metric);
+  }
+  if (metric === "all" || metric === "avg-items") {
+    return requests;
+  }
+
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const nextWeekStart = addDays(weekStart, 7);
+  const monthStart = startOfMonth(now);
+  const nextMonthStart = addMonths(monthStart, 1);
+
+  if (metric === "this-week") {
+    return requests.filter((req) => inRange(req.created_at, weekStart, nextWeekStart));
+  }
+  if (metric === "this-month") {
+    return requests.filter((req) => inRange(req.created_at, monthStart, nextMonthStart));
+  }
+
+  return requests;
+}

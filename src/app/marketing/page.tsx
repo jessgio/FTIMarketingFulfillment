@@ -20,6 +20,7 @@ import {
   List,
   ChevronRight,
   LayoutDashboard,
+  TableProperties,
 } from "lucide-react";
 import { CenteredPage, DashButton, SurfaceCard, cx, fieldInput } from "../../components/dashboard/primitives";
 import {
@@ -47,6 +48,7 @@ import { MarketingChatUnreadBadge } from "../../components/marketing/MarketingCh
 import { MarketingDashboard } from "../../components/marketing/MarketingDashboard";
 import { MarketingRequestDetailModal } from "../../components/marketing/MarketingRequestDetailModal";
 import { MarketingPortalShipmentsPanel } from "../../components/marketing/MarketingPortalShipmentsPanel";
+import { MarketingSummaryPanel } from "../../components/marketing/MarketingSummaryPanel";
 import { MarketingPurposeSummary } from "../../components/marketing/MarketingPurposeSummary";
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
@@ -151,7 +153,7 @@ export default function MarketingPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [portalTab, setPortalTab] = useState<"dashboard" | "submit" | "shipments">("dashboard");
+  const [portalTab, setPortalTab] = useState<"dashboard" | "submit" | "shipments" | "summary">("dashboard");
   const [viewingRequestId, setViewingRequestId] = useState<string | null>(null);
 
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(session);
@@ -460,7 +462,9 @@ export default function MarketingPage() {
       null
     );
   }, [requests, dashboardRequests, viewingRequestId]);
-  const isWidePortal = portalTab === "shipments" || portalTab === "dashboard";
+  const isWidePortal =
+    portalTab === "shipments" || portalTab === "dashboard" || portalTab === "summary";
+  const portalMaxWidth = isWidePortal ? "max-w-7xl" : "max-w-3xl";
 
   if (booting) {
     return (
@@ -546,7 +550,7 @@ export default function MarketingPage() {
         <div
           className={cx(
             "mx-auto px-4 py-4 flex items-center justify-between",
-            portalTab === "shipments" ? "max-w-7xl" : isWidePortal ? "max-w-6xl" : "max-w-3xl"
+            portalMaxWidth
           )}
         >
           <div>
@@ -570,15 +574,15 @@ export default function MarketingPage() {
       <main
         className={cx(
           "mx-auto px-4 py-8 space-y-8",
-          portalTab === "shipments" ? "max-w-7xl" : isWidePortal ? "max-w-6xl" : "max-w-3xl"
+          portalMaxWidth
         )}
       >
-        <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+        <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-xl">
           <DashButton
             type="button"
             onClick={() => setPortalTab("dashboard")}
             className={cx(
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition inline-flex items-center justify-center gap-1.5",
+              "flex-1 min-w-[7rem] rounded-lg px-3 py-2.5 text-sm font-bold transition inline-flex items-center justify-center gap-1.5",
               portalTab === "dashboard" ? "bg-white shadow-sm text-violet-700" : "text-gray-600 hover:text-gray-900"
             )}
           >
@@ -587,9 +591,20 @@ export default function MarketingPage() {
           </DashButton>
           <DashButton
             type="button"
+            onClick={() => setPortalTab("summary")}
+            className={cx(
+              "flex-1 min-w-[7rem] rounded-lg px-3 py-2.5 text-sm font-bold transition inline-flex items-center justify-center gap-1.5",
+              portalTab === "summary" ? "bg-white shadow-sm text-violet-700" : "text-gray-600 hover:text-gray-900"
+            )}
+          >
+            <TableProperties className="w-4 h-4 shrink-0" />
+            Summary
+          </DashButton>
+          <DashButton
+            type="button"
             onClick={() => setPortalTab("submit")}
             className={cx(
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition",
+              "flex-1 min-w-[7rem] rounded-lg px-3 py-2.5 text-sm font-bold transition",
               portalTab === "submit" ? "bg-white shadow-sm text-violet-700" : "text-gray-600 hover:text-gray-900"
             )}
           >
@@ -599,7 +614,7 @@ export default function MarketingPage() {
             type="button"
             onClick={() => setPortalTab("shipments")}
             className={cx(
-              "flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition inline-flex items-center justify-center gap-1.5",
+              "flex-1 min-w-[7rem] rounded-lg px-3 py-2.5 text-sm font-bold transition inline-flex items-center justify-center gap-1.5",
               portalTab === "shipments" ? "bg-white shadow-sm text-violet-700" : "text-gray-600 hover:text-gray-900"
             )}
           >
@@ -625,6 +640,12 @@ export default function MarketingPage() {
               void loadRequests(true);
               void loadDashboardRequests(true);
             }}
+          />
+        ) : portalTab === "summary" ? (
+          <MarketingSummaryPanel
+            requests={dashboardRequests}
+            loading={loadingDashboard}
+            onViewRequest={setViewingRequestId}
           />
         ) : (
         <>

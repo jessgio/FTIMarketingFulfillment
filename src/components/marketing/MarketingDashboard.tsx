@@ -15,11 +15,15 @@ import {
 import { SurfaceCard, cx } from "../dashboard/primitives";
 import { MarketingPortalExportBar } from "./MarketingPortalExportBar";
 import {
+  DASHBOARD_METRIC_LABELS,
   buildMarketingDashboardStats,
+  filterRequestsForDashboardMetric,
   formatDelta,
+  type DashboardMetricKey,
   type MarketingActivityEvent,
   type MarketingTrendBucket,
 } from "../../lib/marketingAnalytics";
+import { MarketingDashboardMetricOrders } from "./MarketingDashboardMetricOrders";
 import {
   ALL_FILTER,
   buildPortalFilterOptions,
@@ -57,11 +61,17 @@ function StatCard({
   value,
   sub,
   accent = "violet",
+  metricKey,
+  selectedMetric,
+  onSelectMetric,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   accent?: "violet" | "blue" | "green" | "amber";
+  metricKey?: DashboardMetricKey;
+  selectedMetric?: DashboardMetricKey | null;
+  onSelectMetric?: (key: DashboardMetricKey) => void;
 }) {
   const accentClasses = {
     violet: "text-violet-700 bg-violet-50 border-violet-100",
@@ -70,12 +80,101 @@ function StatCard({
     amber: "text-amber-800 bg-amber-50 border-amber-100",
   };
 
-  return (
-    <SurfaceCard className={cx("p-4 border", accentClasses[accent])}>
+  const numericValue = typeof value === "number" ? value : Number(value);
+  const clickable = Boolean(metricKey && onSelectMetric && numericValue > 0);
+  const selected = Boolean(metricKey && selectedMetric === metricKey);
+
+  const content = (
+    <>
       <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">{label}</p>
       <p className="text-3xl font-black tabular-nums mt-1 leading-none">{value}</p>
       {sub && <p className="text-xs font-medium mt-2 opacity-90">{sub}</p>}
-    </SurfaceCard>
+      {clickable && (
+        <p className="text-[10px] font-bold uppercase tracking-wide mt-3 opacity-70 inline-flex items-center gap-1">
+          View orders
+          <ChevronRight className="w-3 h-3" />
+        </p>
+      )}
+    </>
+  );
+
+  if (!clickable || !metricKey || !onSelectMetric) {
+    return (
+      <SurfaceCard className={cx("p-4 border", accentClasses[accent])}>{content}</SurfaceCard>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectMetric(metricKey)}
+      className={cx(
+        "w-full text-left rounded-xl border shadow-sm transition p-4",
+        accentClasses[accent],
+        selected && "ring-2 ring-violet-400 ring-offset-2",
+        "hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
+      )}
+      aria-pressed={selected}
+    >
+      {content}
+    </button>
+  );
+}
+
+function StatusMetricCard({
+  label,
+  count,
+  accent,
+  metricKey,
+  selectedMetric,
+  onSelectMetric,
+}: {
+  label: string;
+  count: number;
+  accent: "amber" | "blue" | "green" | "violet";
+  metricKey: DashboardMetricKey;
+  selectedMetric: DashboardMetricKey | null;
+  onSelectMetric: (key: DashboardMetricKey) => void;
+}) {
+  const clickable = count > 0;
+  const selected = selectedMetric === metricKey;
+  const valueColor = {
+    amber: "text-amber-700",
+    blue: "text-blue-700",
+    green: "text-green-700",
+    violet: "text-violet-700",
+  }[accent];
+
+  const content = (
+    <>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{label}</p>
+      <p className={cx("text-2xl font-black tabular-nums mt-1", valueColor)}>{count}</p>
+      {clickable && (
+        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mt-2 inline-flex items-center gap-1">
+          View orders
+          <ChevronRight className="w-3 h-3" />
+        </p>
+      )}
+    </>
+  );
+
+  if (!clickable) {
+    return <SurfaceCard className="p-4 text-center">{content}</SurfaceCard>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectMetric(metricKey)}
+      className={cx(
+        "w-full text-center rounded-xl border border-gray-200 bg-white shadow-sm p-4 transition",
+        selected && "ring-2 ring-violet-400 ring-offset-2",
+        "hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
+      )}
+      aria-pressed={selected}
+    >
+      {content}
+    </button>
   );
 }
 
@@ -150,6 +249,7 @@ export function MarketingDashboard({
 }) {
   const [filters, setFilters] = useState<PortalExportFilters>(() => defaultPortalFilters(session));
   const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<DashboardMetricKey | null>(null);
 
   useEffect(() => {
     if (filtersInitialized) return;
@@ -187,6 +287,19 @@ export function MarketingDashboard({
   const handleExport = () => {
     downloadMarketingHistoryExport(filteredRequests);
   };
+
+  const toggleMetric = (metric: DashboardMetricKey) => {
+    setSelectedMetric((current) => (current === metric ? null : metric));
+  };
+
+  const metricOrders = useMemo(() => {
+    if (!selectedMetric) return [];
+    return filterRequestsForDashboardMetric(filteredRequests, selectedMetric);
+  }, [filteredRequests, selectedMetric]);
+
+  useEffect(() => {
+    setSelectedMetric(null);
+  }, [filters]);
 
   if (loading) {
     return (
@@ -251,51 +364,85 @@ export function MarketingDashboard({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="All-time shipments" value={totals.requests} sub={`${totals.items} items ordered`} />
+        <StatCard
+          label="All-time shipments"
+          value={totals.requests}
+          sub={`${totals.items} items ordered`}
+          metricKey="all"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
+        />
         <StatCard
           label="Avg items / shipment"
           value={totals.avgItemsPerRequest}
           accent="blue"
+          metricKey="avg-items"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
         />
         <StatCard
           label="This week"
           value={periods.thisWeek.requests}
           sub={`${periods.thisWeek.items} items · ${formatDelta(periods.thisWeek.requests, periods.lastWeek.requests)} vs last week`}
           accent="green"
+          metricKey="this-week"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
         />
         <StatCard
           label="This month"
           value={periods.thisMonth.requests}
           sub={`${periods.thisMonth.items} items · ${formatDelta(periods.thisMonth.requests, periods.lastMonth.requests)} vs last month`}
           accent="amber"
+          metricKey="this-month"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
         />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        {(
-          [
-            ["Pending", totals.pending, "amber"],
-            ["Packed", totals.packed, "blue"],
-            ["Shipped", totals.shipped, "green"],
-            ["Cancelled", totals.cancelled, "violet"],
-          ] as const
-        ).map(([label, count, accent]) => (
-          <SurfaceCard key={label} className="p-4 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{label}</p>
-            <p
-              className={cx(
-                "text-2xl font-black tabular-nums mt-1",
-                accent === "amber" && "text-amber-700",
-                accent === "blue" && "text-blue-700",
-                accent === "green" && "text-green-700",
-                accent === "violet" && "text-violet-700"
-              )}
-            >
-              {count}
-            </p>
-          </SurfaceCard>
-        ))}
+        <StatusMetricCard
+          label="Pending"
+          count={totals.pending}
+          accent="amber"
+          metricKey="pending"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
+        />
+        <StatusMetricCard
+          label="Packed"
+          count={totals.packed}
+          accent="blue"
+          metricKey="packed"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
+        />
+        <StatusMetricCard
+          label="Shipped"
+          count={totals.shipped}
+          accent="green"
+          metricKey="shipped"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
+        />
+        <StatusMetricCard
+          label="Cancelled"
+          count={totals.cancelled}
+          accent="violet"
+          metricKey="cancelled"
+          selectedMetric={selectedMetric}
+          onSelectMetric={toggleMetric}
+        />
       </div>
+
+      {selectedMetric && (
+        <MarketingDashboardMetricOrders
+          title={DASHBOARD_METRIC_LABELS[selectedMetric]}
+          requests={metricOrders}
+          onViewRequest={onViewRequest}
+          onClose={() => setSelectedMetric(null)}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TrendBars
@@ -329,7 +476,7 @@ export function MarketingDashboard({
                 {byPurpose.map((row) => (
                   <Fragment key={row.purposeKey || "__none__"}>
                     <tr className="border-t border-gray-100">
-                      <td className="py-2.5 pr-3 font-medium text-violet-900 max-w-[220px] truncate" title={row.label}>
+                      <td className="py-2.5 pr-3 font-medium text-violet-900 max-w-[320px] truncate" title={row.label}>
                         {row.label}
                       </td>
                       <td className="py-2.5 pr-3 text-right font-bold tabular-nums">{row.requests}</td>

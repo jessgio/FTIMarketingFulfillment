@@ -329,7 +329,6 @@ export async function fetchAllMarketingRequestsForRegistry(): Promise<MarketingR
   const { data, error } = await supabase
     .from("marketing_requests")
     .select("*, marketing_request_items(*)")
-    .neq("status", "cancelled")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to load shipment registry"));
