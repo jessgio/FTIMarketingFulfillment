@@ -89,7 +89,7 @@ export async function createMarketingRequest(
       city: input.city.trim(),
       state: input.state.trim(),
       postal_code: input.postal_code.trim(),
-      country: input.country.trim() || "Singapore",
+      country: input.country.trim() || "Indonesia",
       notes: input.notes?.trim() || null,
       request_purpose: requestPurpose,
     })
@@ -161,7 +161,7 @@ export async function updateMarketingRequest(
       city: input.city.trim(),
       state: input.state.trim(),
       postal_code: input.postal_code.trim(),
-      country: input.country.trim() || "Singapore",
+      country: input.country.trim() || "Indonesia",
       notes: input.notes?.trim() || null,
       request_purpose: requestPurpose,
     })

@@ -27,7 +27,7 @@ import { MarketingDashboardMetricOrders } from "./MarketingDashboardMetricOrders
 import {
   ALL_FILTER,
   buildPortalFilterOptions,
-  defaultPortalFilters,
+  defaultDashboardFilters,
   filterRequestsForPortal,
   type PortalExportFilters,
 } from "../../lib/marketingPortalFilters";
@@ -247,15 +247,15 @@ export function MarketingDashboard({
   session: MarketingSession;
   onViewRequest: (id: string) => void;
 }) {
-  const [filters, setFilters] = useState<PortalExportFilters>(() => defaultPortalFilters(session));
+  const [filters, setFilters] = useState<PortalExportFilters>(() => defaultDashboardFilters());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<DashboardMetricKey | null>(null);
 
   useEffect(() => {
     if (filtersInitialized) return;
-    setFilters(defaultPortalFilters(session));
+    setFilters(defaultDashboardFilters());
     setFiltersInitialized(true);
-  }, [session, filtersInitialized]);
+  }, [filtersInitialized]);
 
   const filterOptions = useMemo(() => buildPortalFilterOptions(requests), [requests]);
 
@@ -277,14 +277,7 @@ export function MarketingDashboard({
   );
 
   const clearFilters = () => {
-    setFilters({
-      division: ALL_FILTER,
-      user: ALL_FILTER,
-      purpose: ALL_FILTER,
-      status: ALL_FILTER,
-      dateFrom: "",
-      dateTo: "",
-    });
+    setFilters(defaultDashboardFilters());
   };
 
   const handleExport = () => {

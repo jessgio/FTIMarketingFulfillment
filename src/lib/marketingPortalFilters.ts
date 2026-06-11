@@ -44,6 +44,17 @@ export function defaultPortalFilters(session: MarketingSession): PortalExportFil
   };
 }
 
+export function defaultDashboardFilters(): PortalExportFilters {
+  return {
+    division: ALL_FILTER,
+    user: ALL_FILTER,
+    purpose: ALL_FILTER,
+    status: ALL_FILTER,
+    dateFrom: "",
+    dateTo: "",
+  };
+}
+
 export function defaultSummaryFilters(): SummaryFilters {
   return {
     division: ALL_FILTER,
