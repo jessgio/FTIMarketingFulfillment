@@ -56,7 +56,11 @@ import { MarketingPurposeSummary } from "../../components/marketing/MarketingPur
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
-import { useMarketingRequestDeepLink } from "../../hooks/useMarketingRequestDeepLink";
+import {
+  useClearRequestDeepLinkWhenOpen,
+  useMarketingRequestDeepLink,
+} from "../../hooks/useMarketingRequestDeepLink";
+import type { RequestDeepLinkIntent } from "../../lib/marketingDeepLinks";
 import { buildPortalShipmentRequests } from "../../lib/marketingPortalFilters";
 import { canAccessRequestPortal, roleLabel } from "../../lib/marketingRoles";
 import {
@@ -166,7 +170,7 @@ function MarketingPageContent() {
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(session);
 
   const handleRequestDeepLink = useCallback(
-    async (requestId: string, openChat: boolean) => {
+    async ({ requestId, openChat }: RequestDeepLinkIntent) => {
       setViewingRequestId(requestId);
       setDeepLinkChatOpen(openChat);
       setDeepLinkLoading(true);
@@ -510,6 +514,8 @@ function MarketingPageContent() {
       (deepLinkedRequest?.id === viewingRequestId ? deepLinkedRequest : null)
     );
   }, [requests, dashboardRequests, viewingRequestId, deepLinkedRequest]);
+  useClearRequestDeepLinkWhenOpen(viewingRequestId, Boolean(viewingRequest));
+
   const isWidePortal =
     portalTab === "shipments" || portalTab === "dashboard" || portalTab === "summary";
   const portalMaxWidth = isWidePortal ? "max-w-7xl" : "max-w-3xl";

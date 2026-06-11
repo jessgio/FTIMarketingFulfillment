@@ -1,39 +1,36 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
-  readRequestDeepLinkFromSearch,
-  stripRequestDeepLinkFromSearch,
-  takePendingDeepLink,
+  clearPendingDeepLink,
+  clearRequestDeepLinkFromBrowserUrl,
+  readRequestDeepLinkIntent,
+  type RequestDeepLinkIntent,
 } from "../lib/marketingDeepLinks";
 
 export function useMarketingRequestDeepLink(
-  onOpenRequest: (requestId: string, openChat: boolean) => void,
-  enabled = true
+  onOpenRequest: (intent: RequestDeepLinkIntent) => void | Promise<void>
 ) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const processedRef = useRef<string | null>(null);
-  const search = searchParams.toString();
+  const openedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (openedRef.current) return;
+
+    const intent = readRequestDeepLinkIntent();
+    if (!intent) return;
+
+    openedRef.current = true;
+    void Promise.resolve(onOpenRequest(intent));
+  }, [onOpenRequest]);
+}
+
+export function useClearRequestDeepLinkWhenOpen(requestId: string | null, isOpen: boolean) {
+  const clearedRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
-
-    const fromUrl = readRequestDeepLinkFromSearch(search ? `?${search}` : "");
-    const fromStorage = takePendingDeepLink();
-    const requestId = fromUrl.requestId ?? fromStorage?.requestId ?? null;
-    const openChat = fromUrl.requestId ? fromUrl.openChat : Boolean(fromStorage?.openChat);
-
-    if (!requestId || processedRef.current === requestId) return;
-    processedRef.current = requestId;
-
-    onOpenRequest(requestId, openChat);
-
-    if (fromUrl.requestId) {
-      const nextSearch = stripRequestDeepLinkFromSearch(search ? `?${search}` : "");
-      router.replace(`${pathname}${nextSearch}`, { scroll: false });
-    }
-  }, [enabled, onOpenRequest, pathname, router, search]);
+    if (!requestId || !isOpen || clearedRef.current) return;
+    clearedRef.current = true;
+    clearPendingDeepLink();
+    clearRequestDeepLinkFromBrowserUrl();
+  }, [requestId, isOpen]);
 }

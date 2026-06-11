@@ -26,7 +26,11 @@ import { MarketingShipmentsRegistry } from "../../../components/marketing/Market
 import { RequestChat } from "../../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../../hooks/useMarketingChatUnread";
-import { useMarketingRequestDeepLink } from "../../../hooks/useMarketingRequestDeepLink";
+import {
+  useClearRequestDeepLinkWhenOpen,
+  useMarketingRequestDeepLink,
+} from "../../../hooks/useMarketingRequestDeepLink";
+import type { RequestDeepLinkIntent } from "../../../lib/marketingDeepLinks";
 import { useMarketingUnseenOrders } from "../../../hooks/useMarketingUnseenOrders";
 import { getMarketingSession } from "../../../lib/marketingAuth";
 import { canFulfill, isAdmin } from "../../../lib/marketingRoles";
@@ -155,31 +159,29 @@ function MarketingFulfillPageContent() {
     [chatSession, refreshUnseen]
   );
 
-  const handleRequestDeepLink = useCallback(
-    async (requestId: string, openChat: boolean) => {
-      setViewingRequestId(requestId);
-      setDeepLinkChatOpen(openChat);
-      setDeepLinkLoading(true);
-      try {
-        const existing =
-          allRequests.find((req) => req.id === requestId) ??
-          (deepLinkedRequest?.id === requestId ? deepLinkedRequest : null);
-        if (!existing) {
-          const req = await fetchMarketingRequestById(requestId);
-          if (req) setDeepLinkedRequest(req);
-        }
-        if (chatSession && canFulfill(chatSession)) {
-          await markMarketingRequestSeenByAdmin(chatSession, requestId);
-          refreshUnseen();
-        }
-      } finally {
-        setDeepLinkLoading(false);
+  const handleRequestDeepLink = useCallback(async ({ requestId, openChat }: RequestDeepLinkIntent) => {
+    setViewingRequestId(requestId);
+    setDeepLinkChatOpen(openChat);
+    setDeepLinkLoading(true);
+    try {
+      const existing =
+        allRequests.find((req) => req.id === requestId) ??
+        (deepLinkedRequest?.id === requestId ? deepLinkedRequest : null);
+      if (!existing) {
+        const req = await fetchMarketingRequestById(requestId);
+        if (req) setDeepLinkedRequest(req);
       }
-    },
-    [allRequests, chatSession, deepLinkedRequest, refreshUnseen]
-  );
+    } finally {
+      setDeepLinkLoading(false);
+    }
+  }, [allRequests, deepLinkedRequest]);
 
   useMarketingRequestDeepLink(handleRequestDeepLink);
+
+  useEffect(() => {
+    if (!viewingRequestId || !chatSession || !canFulfill(chatSession)) return;
+    void markMarketingRequestSeenByAdmin(chatSession, viewingRequestId).then(() => refreshUnseen());
+  }, [viewingRequestId, chatSession, refreshUnseen]);
 
   const handleDeleteRequest = async (req: MarketingRequest) => {
     if (!chatSession || !isAdmin(chatSession)) return;
@@ -420,6 +422,8 @@ function MarketingFulfillPageContent() {
   const viewingRequest =
     allRequests.find((req) => req.id === viewingRequestId) ??
     (deepLinkedRequest?.id === viewingRequestId ? deepLinkedRequest : null);
+
+  useClearRequestDeepLinkWhenOpen(viewingRequestId, Boolean(viewingRequest));
 
   return (
     <div className={cx("min-h-screen bg-gray-100", selectedIds.length > 0 ? "pb-28" : "pb-12")}>

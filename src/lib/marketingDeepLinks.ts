@@ -5,6 +5,11 @@ export const REQUEST_DEEP_LINK_PARAM = "request";
 export const CHAT_DEEP_LINK_PARAM = "chat";
 export const PENDING_DEEP_LINK_KEY = "marketing:pendingDeepLink";
 
+export type RequestDeepLinkIntent = {
+  requestId: string;
+  openChat: boolean;
+};
+
 export function portalForSession(session: MarketingSession | null): "marketing" | "fulfill" {
   if (!session) return "fulfill";
   if (canAccessFulfillPortal(session) && !canAccessRequestPortal(session)) {
@@ -52,11 +57,10 @@ export function stashPendingDeepLink(requestId: string, openChat: boolean) {
   );
 }
 
-export function takePendingDeepLink(): { requestId: string; openChat: boolean } | null {
+export function peekPendingDeepLink(): RequestDeepLinkIntent | null {
   if (typeof window === "undefined") return null;
   const raw = sessionStorage.getItem(PENDING_DEEP_LINK_KEY);
   if (!raw) return null;
-  sessionStorage.removeItem(PENDING_DEEP_LINK_KEY);
   try {
     const parsed = JSON.parse(raw) as { requestId?: string; openChat?: boolean };
     if (typeof parsed.requestId === "string" && parsed.requestId.trim()) {
@@ -69,6 +73,25 @@ export function takePendingDeepLink(): { requestId: string; openChat: boolean } 
     return null;
   }
   return null;
+}
+
+export function clearPendingDeepLink() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(PENDING_DEEP_LINK_KEY);
+}
+
+export function readRequestDeepLinkIntent(): RequestDeepLinkIntent | null {
+  if (typeof window === "undefined") return null;
+
+  const fromUrl = readRequestDeepLinkFromSearch(window.location.search);
+  if (fromUrl.requestId) {
+    return {
+      requestId: fromUrl.requestId,
+      openChat: fromUrl.openChat,
+    };
+  }
+
+  return peekPendingDeepLink();
 }
 
 export function readRequestDeepLinkFromSearch(search: string): {
@@ -88,4 +111,13 @@ export function stripRequestDeepLinkFromSearch(search: string): string {
   params.delete(CHAT_DEEP_LINK_PARAM);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
+}
+
+export function clearRequestDeepLinkFromBrowserUrl() {
+  if (typeof window === "undefined") return;
+  const nextSearch = stripRequestDeepLinkFromSearch(window.location.search);
+  const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
+  if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl) {
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }
 }
