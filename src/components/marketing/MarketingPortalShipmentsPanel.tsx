@@ -9,7 +9,7 @@ import {
   ALL_FILTER,
   buildPortalFilterOptions,
   defaultPortalFilters,
-  filterRequestsForPortal,
+  filterPortalShipmentRequests,
   type PortalExportFilters,
 } from "../../lib/marketingPortalFilters";
 import { downloadMarketingHistoryExport } from "../../lib/marketingExport";
@@ -62,8 +62,8 @@ export function MarketingPortalShipmentsPanel({
   const filterOptions = useMemo(() => buildPortalFilterOptions(requests), [requests]);
 
   const filteredRequests = useMemo(
-    () => filterRequestsForPortal(requests, filters),
-    [requests, filters]
+    () => filterPortalShipmentRequests(requests, filters, session.email),
+    [requests, filters, session.email]
   );
 
   const shipmentsByPurpose = useMemo(

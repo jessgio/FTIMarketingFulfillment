@@ -51,6 +51,7 @@ import { MarketingPurposeSummary } from "../../components/marketing/MarketingPur
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
+import { buildPortalShipmentRequests } from "../../lib/marketingPortalFilters";
 import { canAccessRequestPortal, roleLabel } from "../../lib/marketingRoles";
 import {
   MARKETING_COURIER_OPTIONS,
@@ -446,10 +447,10 @@ export default function MarketingPage() {
     }
   };
 
-  const portalShipmentRequests = useMemo(
-    () => dashboardRequests.filter((req) => req.status !== "cancelled"),
-    [dashboardRequests]
-  );
+  const portalShipmentRequests = useMemo(() => {
+    if (!session) return [];
+    return buildPortalShipmentRequests(dashboardRequests, requests, session.email);
+  }, [dashboardRequests, requests, session]);
   const requestsByPurpose = useMemo(() => groupRequestsByPurpose(requests), [requests]);
   const viewingRequest = useMemo(() => {
     if (!viewingRequestId) return null;
