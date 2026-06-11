@@ -14,6 +14,7 @@ Run migrations in order against a **new** Supabase project (separate from Aeris 
 8. `008_marketing_actual_shipping_label.sql` — tracking for Regular/Kargo
 9. `009_marketing_admin_request_views.sql` — new-order badges for admins
 10. `010_user_divisions_and_roles.sql` — divisions + requester/fulfillment/admin roles
+11. `011_add_courier_options.sql` — Rayspeed, UPS, DHL, FedEx courier options
 
 Apply via Supabase SQL Editor (paste each file in order) or `supabase db push` if linked locally.
 
