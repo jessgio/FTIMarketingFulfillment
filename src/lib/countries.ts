@@ -3,7 +3,7 @@ export type ShippingCountry = {
   name: string;
 };
 
-/** Countries supported for postal lookup (Zippopotam ISO codes). */
+/** Countries supported for postal lookup. */
 export const SHIPPING_COUNTRIES: ShippingCountry[] = [
   { code: "ID", name: "Indonesia" },
   { code: "SG", name: "Singapore" },
