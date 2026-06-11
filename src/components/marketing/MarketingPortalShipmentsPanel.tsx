@@ -8,10 +8,9 @@ import { MarketingPurposeSummary } from "./MarketingPurposeSummary";
 import { MarketingShipmentsRegistry } from "./MarketingShipmentsRegistry";
 import { deleteMarketingRequestsBulk } from "../../lib/marketingDb";
 import {
-  ALL_FILTER,
   buildPortalFilterOptions,
   canDeletePortalShipment,
-  defaultPortalFilters,
+  defaultShipmentPortalFilters,
   filterPortalShipmentRequests,
   type PortalExportFilters,
 } from "../../lib/marketingPortalFilters";
@@ -54,18 +53,11 @@ export function MarketingPortalShipmentsPanel({
   onUpdated: () => void;
   onDeleted?: (ids: string[]) => void;
 }) {
-  const [filters, setFilters] = useState<PortalExportFilters>(() => defaultPortalFilters(session));
-  const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const [filters, setFilters] = useState<PortalExportFilters>(defaultShipmentPortalFilters);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-
-  useEffect(() => {
-    if (filtersInitialized) return;
-    setFilters(defaultPortalFilters(session));
-    setFiltersInitialized(true);
-  }, [session, filtersInitialized]);
 
   const filterOptions = useMemo(() => buildPortalFilterOptions(requests), [requests]);
 
@@ -151,14 +143,7 @@ export function MarketingPortalShipmentsPanel({
   };
 
   const clearFilters = () => {
-    setFilters({
-      division: ALL_FILTER,
-      user: ALL_FILTER,
-      purpose: ALL_FILTER,
-      status: ALL_FILTER,
-      dateFrom: "",
-      dateTo: "",
-    });
+    setFilters(defaultShipmentPortalFilters());
   };
 
   if (loading) {
