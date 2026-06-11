@@ -62,7 +62,12 @@ import {
 } from "../../hooks/useMarketingRequestDeepLink";
 import type { RequestDeepLinkIntent } from "../../lib/marketingDeepLinks";
 import { buildPortalShipmentRequests } from "../../lib/marketingPortalFilters";
-import { canAccessRequestPortal, roleLabel } from "../../lib/marketingRoles";
+import {
+  canAccessRequestPortal,
+  canDeleteMarketingRequest,
+  isAdmin,
+  roleLabel,
+} from "../../lib/marketingRoles";
 import {
   MARKETING_COURIER_OPTIONS,
   type MarketingCourier,
@@ -374,9 +379,11 @@ function MarketingPageContent() {
   };
 
   const handleDeleteRequest = async (req: MarketingRequest) => {
-    if (!session || req.status !== "pending") return;
+    if (!session || !canDeleteMarketingRequest(session, req)) return;
     const confirmed = window.confirm(
-      `Delete request for ${req.recipient_name} (${req.barcode})?\n\nThis cannot be undone.`
+      `Delete request for ${req.recipient_name} (${req.barcode})?${
+        isAdmin(session) ? `\n\nStatus: ${req.status}.` : ""
+      }\n\nThis cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -385,7 +392,13 @@ function MarketingPageContent() {
     try {
       await deleteMarketingRequest(session, req.id);
       if (editingId === req.id) resetForm();
+      if (viewingRequestId === req.id) {
+        setViewingRequestId(null);
+        setDeepLinkChatOpen(false);
+        setDeepLinkedRequest(null);
+      }
       await loadRequests();
+      await loadDashboardRequests(true);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Failed to delete request");
     } finally {
@@ -701,6 +714,13 @@ function MarketingPageContent() {
             onUpdated={() => {
               void loadRequests(true);
               void loadDashboardRequests(true);
+            }}
+            onDeleted={(deletedIds) => {
+              if (viewingRequestId && deletedIds.includes(viewingRequestId)) {
+                setViewingRequestId(null);
+                setDeepLinkChatOpen(false);
+                setDeepLinkedRequest(null);
+              }
             }}
           />
         ) : portalTab === "summary" ? (
@@ -1146,31 +1166,35 @@ function MarketingPageContent() {
                       )}
                     </div>
                   </button>
-                  {req.status === "pending" && (
+                  {(req.status === "pending" || (session && isAdmin(session))) && (
                     <div className="mt-3 flex justify-end gap-2">
-                      <DashButton
-                        type="button"
-                        variant="subtle"
-                        size="sm"
-                        onClick={() => loadRequestForEdit(req)}
-                        disabled={deletingId === req.id}
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </DashButton>
-                      <DashButton
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeleteRequest(req)}
-                        disabled={deletingId === req.id}
-                      >
-                        {deletingId === req.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                        Delete
-                      </DashButton>
+                      {req.status === "pending" && (
+                        <DashButton
+                          type="button"
+                          variant="subtle"
+                          size="sm"
+                          onClick={() => loadRequestForEdit(req)}
+                          disabled={deletingId === req.id}
+                        >
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </DashButton>
+                      )}
+                      {canDeleteMarketingRequest(session, req) && (
+                        <DashButton
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteRequest(req)}
+                          disabled={deletingId === req.id}
+                        >
+                          {deletingId === req.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          Delete
+                        </DashButton>
+                      )}
                     </div>
                   )}
                   <RequestChat
@@ -1215,6 +1239,12 @@ function MarketingPageContent() {
           defaultChatOpen={deepLinkChatOpen}
           unreadCount={unreadByRequestId[viewingRequest.id] ?? 0}
           onRead={refreshUnread}
+          onDelete={
+            canDeleteMarketingRequest(session, viewingRequest)
+              ? () => handleDeleteRequest(viewingRequest)
+              : undefined
+          }
+          deleting={deletingId === viewingRequest.id}
         />
       )}
     </div>

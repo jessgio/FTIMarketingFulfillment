@@ -1,4 +1,4 @@
-import type { MarketingSession, MarketingUserRole } from "../types/marketing";
+import type { MarketingRequest, MarketingSession, MarketingUserRole } from "../types/marketing";
 
 /** Legacy DB value — treated as requester in app code. */
 const LEGACY_REQUESTER_ROLE = "marketing";
@@ -25,6 +25,18 @@ export function canFulfill(session: MarketingSession): boolean {
 
 export function isAdmin(session: MarketingSession): boolean {
   return session.role === "admin";
+}
+
+export function canDeleteMarketingRequest(
+  session: MarketingSession,
+  req: MarketingRequest
+): boolean {
+  if (req.status === "cancelled") return false;
+  if (isAdmin(session)) return true;
+  return (
+    req.requested_by_email.trim().toLowerCase() === session.email.trim().toLowerCase() &&
+    req.status === "pending"
+  );
 }
 
 export function roleLabel(role: MarketingUserRole): string {

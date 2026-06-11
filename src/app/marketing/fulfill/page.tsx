@@ -185,13 +185,9 @@ function MarketingFulfillPageContent() {
 
   const handleDeleteRequest = async (req: MarketingRequest) => {
     if (!chatSession || !isAdmin(chatSession)) return;
-    if (req.status !== "shipped") {
-      setError("Only completed (shipped) orders can be deleted.");
-      return;
-    }
 
     const confirmed = window.confirm(
-      `Delete completed shipment for ${req.recipient_name} (${req.barcode})?\n\nThis removes it from the marketing portal and cannot be undone.`
+      `Delete shipment for ${req.recipient_name} (${req.barcode})?\n\nStatus: ${req.status}. This removes it from the marketing portal and cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -333,11 +329,12 @@ function MarketingFulfillPageContent() {
     if (!chatSession || !isAdmin(chatSession)) return;
     if (selectedIds.length === 0) return;
 
-    const selected = completedRequests.filter((req) => selectedIds.includes(req.id));
+    const pool = moduleTab === "HISTORY" ? completedRequests : requests;
+    const selected = pool.filter((req) => selectedIds.includes(req.id));
     if (selected.length === 0) return;
 
     const confirmed = window.confirm(
-      `Delete ${selected.length} completed shipment${selected.length === 1 ? "" : "s"}?\n\nThis removes them from the marketing portal and cannot be undone.`
+      `Delete ${selected.length} shipment${selected.length === 1 ? "" : "s"}?\n\nThis removes them from the marketing portal and cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -355,9 +352,7 @@ function MarketingFulfillPageContent() {
       await loadQueue(true);
       refreshUnseen();
       setScanOk(true);
-      setScanMessage(
-        `Deleted ${deleted} completed shipment${deleted === 1 ? "" : "s"}.`
-      );
+      setScanMessage(`Deleted ${deleted} shipment${deleted === 1 ? "" : "s"}.`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to delete selected orders");
     } finally {
@@ -592,8 +587,8 @@ function MarketingFulfillPageContent() {
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/80">
                 <h2 className="font-bold text-gray-900">Shipped orders</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Click a row to view order details, select rows to export audit CSV, or delete completed
-                  shipments as admin.
+                  Click a row to view order details, select rows to export audit CSV, or delete shipments as
+                  admin.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -861,11 +856,15 @@ function MarketingFulfillPageContent() {
               <p className="font-bold text-gray-900 leading-tight">Orders selected</p>
               <p className="text-xs text-gray-600 font-medium">
                 {moduleTab === "ACTIVE"
-                  ? selectedPendingCount > 0
-                    ? `${selectedPendingCount} pending · print labels or mark packed with manifest`
-                    : "Batch print shipping labels"
+                  ? chatSession && isAdmin(chatSession)
+                    ? selectedPendingCount > 0
+                      ? `${selectedPendingCount} pending · print labels, mark packed, or delete`
+                      : "Print labels or delete selected shipments"
+                    : selectedPendingCount > 0
+                      ? `${selectedPendingCount} pending · print labels or mark packed with manifest`
+                      : "Batch print shipping labels"
                   : chatSession && isAdmin(chatSession)
-                    ? "Export audit CSV or delete completed shipments"
+                    ? "Export audit CSV or delete shipments"
                     : "Export audit CSV with pack/ship details"}
               </p>
             </div>
@@ -892,6 +891,21 @@ function MarketingFulfillPageContent() {
                   )}
                   Mark packed
                 </DashButton>
+                {chatSession && isAdmin(chatSession) && (
+                  <DashButton
+                    variant="danger"
+                    size="md"
+                    onClick={handleBatchDeleteSelected}
+                    disabled={batchDeleting}
+                  >
+                    {batchDeleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    Delete
+                  </DashButton>
+                )}
               </>
             ) : (
               <>
@@ -941,7 +955,7 @@ function MarketingFulfillPageContent() {
           unreadCount={unreadByRequestId[viewingRequest.id] ?? 0}
           onRead={refreshUnread}
           onDelete={
-            chatSession && isAdmin(chatSession) && viewingRequest.status === "shipped"
+            chatSession && isAdmin(chatSession)
               ? () => handleDeleteRequest(viewingRequest)
               : undefined
           }

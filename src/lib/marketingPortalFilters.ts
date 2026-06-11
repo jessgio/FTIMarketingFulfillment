@@ -1,3 +1,4 @@
+import { canDeleteMarketingRequest } from "./marketingRoles";
 import type { MarketingRequest, MarketingRequestStatus, MarketingSession } from "../types/marketing";
 
 export const ALL_FILTER = "__all__";
@@ -115,6 +116,13 @@ function matchesPortalDatePurposeAndStatusFilters(
   if (fromTs !== null && createdTs < fromTs) return false;
   if (toTs !== null && createdTs > toTs) return false;
   return true;
+}
+
+export function canDeletePortalShipment(
+  req: MarketingRequest,
+  session: MarketingSession
+): boolean {
+  return canDeleteMarketingRequest(session, req);
 }
 
 export function buildPortalShipmentRequests(

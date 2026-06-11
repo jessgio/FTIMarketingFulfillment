@@ -226,7 +226,8 @@ export function MarketingShipmentsRegistry({
             <p className="text-sm text-gray-600 mt-1">
               {isPortal ? (
                 <>
-                  Filter above, tick rows to bulk export, or export all matching shipments as CSV.
+                  Filter above, tick rows to bulk export or delete your pending requests, or export all
+                  matching shipments as CSV.
                 </>
               ) : (
                 <>

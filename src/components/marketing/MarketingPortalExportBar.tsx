@@ -147,8 +147,8 @@ export function MarketingPortalExportBar({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-gray-600">
           {selectedCount > 0
-            ? `${selectedCount} selected · exports selection only`
-            : `${filteredCount} matching · select rows below to export a subset, or export all matching`}
+            ? `${selectedCount} selected · export or delete from the action bar below`
+            : `${filteredCount} matching · select rows below to export or delete a subset, or export all matching`}
         </p>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           {activeFilters && (
