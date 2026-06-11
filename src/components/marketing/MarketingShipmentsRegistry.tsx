@@ -161,9 +161,7 @@ export function MarketingShipmentsRegistry({
     !!session && (isFulfillmentStaff || req.requested_by_email === session.email);
 
   const canEditLabel = (req: MarketingRequest) =>
-    !!session &&
-    courierNeedsActualShippingLabel(req.preferred_courier) &&
-    (isFulfillmentStaff || req.requested_by_email === session.email);
+    isFulfillmentStaff && courierNeedsActualShippingLabel(req.preferred_courier);
 
   const handleSavePurpose = async (req: MarketingRequest) => {
     if (!session || !canEditPurpose(req)) return;
@@ -254,7 +252,8 @@ export function MarketingShipmentsRegistry({
         </div>
         {!isPortal && !isFulfillmentStaff && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-            Sign in as fulfillment or admin above to edit purpose and shipping labels for any order.
+            Sign in as fulfillment or admin above to edit purpose for any order. Shipping labels can only be
+            entered by fulfillment staff.
           </p>
         )}
       </div>

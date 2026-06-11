@@ -395,6 +395,24 @@ async function assertCanEditRegistryField(
   }
 }
 
+async function assertCanEditShippingLabel(session: MarketingSession, id: string): Promise<void> {
+  if (!canFulfill(session)) {
+    throw new Error("Only fulfillment staff can edit shipping labels.");
+  }
+
+  const { data, error } = await supabase
+    .from("marketing_requests")
+    .select("id, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to verify request"));
+  if (!data) throw new Error("Request not found.");
+  if (data.status === "cancelled") {
+    throw new Error("Cancelled requests cannot be edited.");
+  }
+}
+
 export async function updateMarketingRequestPurpose(
   session: MarketingSession,
   id: string,
@@ -424,7 +442,7 @@ export async function updateMarketingActualShippingLabel(
   id: string,
   label: string
 ): Promise<MarketingRequest> {
-  await assertCanEditRegistryField(session, id);
+  await assertCanEditShippingLabel(session, id);
 
   const trimmed = label.trim();
   const { data, error } = await supabase
