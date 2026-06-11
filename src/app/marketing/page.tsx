@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -112,7 +112,7 @@ function groupRequestsByPurpose(requests: MarketingRequest[]): PurposeGroup[] {
     }));
 }
 
-export default function MarketingPage() {
+function MarketingPageContent() {
   const [session, setSession] = useState<MarketingSession | null>(null);
   const [booting, setBooting] = useState(true);
 
@@ -160,19 +160,33 @@ export default function MarketingPage() {
   const [portalTab, setPortalTab] = useState<"dashboard" | "submit" | "shipments" | "summary">("dashboard");
   const [viewingRequestId, setViewingRequestId] = useState<string | null>(null);
   const [deepLinkChatOpen, setDeepLinkChatOpen] = useState(false);
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false);
   const [deepLinkedRequest, setDeepLinkedRequest] = useState<MarketingRequest | null>(null);
 
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(session);
 
-  const handleRequestDeepLink = useCallback((requestId: string, openChat: boolean) => {
-    setViewingRequestId(requestId);
-    setDeepLinkChatOpen(openChat);
-    void fetchMarketingRequestById(requestId).then((req) => {
-      if (req) setDeepLinkedRequest(req);
-    });
-  }, []);
+  const handleRequestDeepLink = useCallback(
+    async (requestId: string, openChat: boolean) => {
+      setViewingRequestId(requestId);
+      setDeepLinkChatOpen(openChat);
+      setDeepLinkLoading(true);
+      try {
+        const existing =
+          requests.find((req) => req.id === requestId) ??
+          dashboardRequests.find((req) => req.id === requestId) ??
+          (deepLinkedRequest?.id === requestId ? deepLinkedRequest : null);
+        if (!existing) {
+          const req = await fetchMarketingRequestById(requestId);
+          if (req) setDeepLinkedRequest(req);
+        }
+      } finally {
+        setDeepLinkLoading(false);
+      }
+    },
+    [requests, dashboardRequests, deepLinkedRequest]
+  );
 
-  useMarketingRequestDeepLink(handleRequestDeepLink, !booting);
+  useMarketingRequestDeepLink(handleRequestDeepLink);
 
   useEffect(() => {
     const stored = getMarketingSession();
@@ -1166,6 +1180,15 @@ export default function MarketingPage() {
         )}
       </main>
 
+      {viewingRequestId && deepLinkLoading && !viewingRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-6 shadow-xl text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-violet-600 mx-auto" />
+            <p className="text-sm text-gray-600 mt-3">Opening package thread…</p>
+          </div>
+        </div>
+      )}
+
       {viewingRequest && (
         <MarketingRequestDetailModal
           request={viewingRequest}
@@ -1181,5 +1204,19 @@ export default function MarketingPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function MarketingPage() {
+  return (
+    <Suspense
+      fallback={
+        <CenteredPage>
+          <Loader2 className="animate-spin w-10 h-10 text-violet-600" />
+        </CenteredPage>
+      }
+    >
+      <MarketingPageContent />
+    </Suspense>
   );
 }

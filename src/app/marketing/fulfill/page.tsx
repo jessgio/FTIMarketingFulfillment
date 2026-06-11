@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -87,7 +87,7 @@ function isFormFieldFocused(): boolean {
   );
 }
 
-export default function MarketingFulfillPage() {
+function MarketingFulfillPageContent() {
   const [moduleTab, setModuleTab] = useState<"ACTIVE" | "HISTORY" | "SHIPMENTS">("ACTIVE");
   const [requests, setRequests] = useState<MarketingRequest[]>([]);
   const [completedRequests, setCompletedRequests] = useState<MarketingRequest[]>([]);
@@ -106,6 +106,7 @@ export default function MarketingFulfillPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingRequestId, setViewingRequestId] = useState<string | null>(null);
   const [deepLinkChatOpen, setDeepLinkChatOpen] = useState(false);
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false);
   const [deepLinkedRequest, setDeepLinkedRequest] = useState<MarketingRequest | null>(null);
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(chatSession);
   const { totalUnseen, unseenByRequestId, refreshUnseen } = useMarketingUnseenOrders(chatSession);
@@ -155,17 +156,27 @@ export default function MarketingFulfillPage() {
   );
 
   const handleRequestDeepLink = useCallback(
-    (requestId: string, openChat: boolean) => {
+    async (requestId: string, openChat: boolean) => {
       setViewingRequestId(requestId);
       setDeepLinkChatOpen(openChat);
-      if (chatSession && canFulfill(chatSession)) {
-        void markMarketingRequestSeenByAdmin(chatSession, requestId).then(() => refreshUnseen());
+      setDeepLinkLoading(true);
+      try {
+        const existing =
+          allRequests.find((req) => req.id === requestId) ??
+          (deepLinkedRequest?.id === requestId ? deepLinkedRequest : null);
+        if (!existing) {
+          const req = await fetchMarketingRequestById(requestId);
+          if (req) setDeepLinkedRequest(req);
+        }
+        if (chatSession && canFulfill(chatSession)) {
+          await markMarketingRequestSeenByAdmin(chatSession, requestId);
+          refreshUnseen();
+        }
+      } finally {
+        setDeepLinkLoading(false);
       }
-      void fetchMarketingRequestById(requestId).then((req) => {
-        if (req) setDeepLinkedRequest(req);
-      });
     },
-    [chatSession, refreshUnseen]
+    [allRequests, chatSession, deepLinkedRequest, refreshUnseen]
   );
 
   useMarketingRequestDeepLink(handleRequestDeepLink);
@@ -891,6 +902,15 @@ export default function MarketingFulfillPage() {
         </div>
       )}
 
+      {viewingRequestId && deepLinkLoading && !viewingRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-6 shadow-xl text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-violet-600 mx-auto" />
+            <p className="text-sm text-gray-600 mt-3">Opening package thread…</p>
+          </div>
+        </div>
+      )}
+
       {viewingRequest && (
         <MarketingRequestDetailModal
           request={viewingRequest}
@@ -912,5 +932,19 @@ export default function MarketingFulfillPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function MarketingFulfillPage() {
+  return (
+    <Suspense
+      fallback={
+        <CenteredPage>
+          <Loader2 className="animate-spin w-10 h-10 text-violet-600" />
+        </CenteredPage>
+      }
+    >
+      <MarketingFulfillPageContent />
+    </Suspense>
   );
 }

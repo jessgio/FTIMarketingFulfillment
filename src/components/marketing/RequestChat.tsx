@@ -41,6 +41,10 @@ export function RequestChat({
   onRead?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
   const [messages, setMessages] = useState<MarketingRequestMessage[]>([]);
   const [participants, setParticipants] = useState<MarketingChatParticipant[]>([]);
   const [loading, setLoading] = useState(false);

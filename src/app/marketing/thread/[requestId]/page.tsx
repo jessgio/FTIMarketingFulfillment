@@ -5,7 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { CenteredPage } from "../../../../components/dashboard/primitives";
 import { getMarketingSession } from "../../../../lib/marketingAuth";
-import { buildRequestPortalUrl, portalForSession } from "../../../../lib/marketingDeepLinks";
+import {
+  buildRequestPortalPath,
+  portalForSession,
+  stashPendingDeepLink,
+} from "../../../../lib/marketingDeepLinks";
 
 export default function MarketingThreadPage() {
   const params = useParams();
@@ -20,10 +24,12 @@ export default function MarketingThreadPage() {
 
     const session = getMarketingSession();
     const portal = portalForSession(session);
-    const url = buildRequestPortalUrl(window.location.origin, requestId, portal, {
-      openChat: true,
-    });
-    router.replace(url);
+    stashPendingDeepLink(requestId, true);
+    router.replace(
+      buildRequestPortalPath(requestId, portal, {
+        openChat: true,
+      })
+    );
   }, [requestId, router]);
 
   return (
