@@ -32,12 +32,19 @@ export interface MarketingPurposeRequesterStat {
   items: number;
 }
 
+export interface MarketingPurposeDivisionStat {
+  division: string;
+  requests: number;
+  items: number;
+}
+
 export interface MarketingPurposeStat {
   label: string;
   purposeKey: string;
   requests: number;
   items: number;
   byRequester?: MarketingPurposeRequesterStat[];
+  byDivision?: MarketingPurposeDivisionStat[];
 }
 
 export interface MarketingProductStat {
@@ -134,6 +141,11 @@ function purposeKeyFromRequest(req: MarketingRequest): string {
   return req.request_purpose?.trim() || "";
 }
 
+function divisionLabelFromRequest(req: MarketingRequest): string {
+  const trimmed = req.requested_by_division?.trim();
+  return trimmed || "Other";
+}
+
 function attachRequesterBreakdown(
   requests: MarketingRequest[],
   purposeStats: MarketingPurposeStat[]
@@ -171,9 +183,48 @@ function attachRequesterBreakdown(
   });
 }
 
+function attachDivisionBreakdown(
+  requests: MarketingRequest[],
+  purposeStats: MarketingPurposeStat[]
+): MarketingPurposeStat[] {
+  const requestsByPurpose = new Map<string, MarketingRequest[]>();
+  for (const req of requests) {
+    const key = purposeKeyFromRequest(req);
+    const list = requestsByPurpose.get(key) ?? [];
+    list.push(req);
+    requestsByPurpose.set(key, list);
+  }
+
+  return purposeStats.map((stat) => {
+    const purposeRequests = requestsByPurpose.get(stat.purposeKey) ?? [];
+    const divisionMap = new Map<string, MarketingPurposeDivisionStat>();
+
+    for (const req of purposeRequests) {
+      const division = divisionLabelFromRequest(req);
+      const entry = divisionMap.get(division) ?? {
+        division,
+        requests: 0,
+        items: 0,
+      };
+      entry.requests++;
+      entry.items += countItems(req);
+      divisionMap.set(division, entry);
+    }
+
+    const byDivision = [...divisionMap.values()].sort(
+      (a, b) => b.requests - a.requests || a.division.localeCompare(b.division)
+    );
+
+    return byDivision.length > 0 ? { ...stat, byDivision } : stat;
+  });
+}
+
 export function buildMarketingDashboardStats(
   requests: MarketingRequest[],
-  options?: { includeRequesterBreakdown?: boolean }
+  options?: {
+    includeRequesterBreakdown?: boolean;
+    includeDivisionBreakdown?: boolean;
+  }
 ): MarketingDashboardStats {
   const now = new Date();
   const weekStart = startOfWeek(now);
@@ -282,9 +333,12 @@ export function buildMarketingDashboardStats(
 
   const requestCount = requests.length;
   const byPurposeBase = [...purposeMap.values()].sort((a, b) => b.requests - a.requests);
-  const byPurpose = options?.includeRequesterBreakdown
-    ? attachRequesterBreakdown(requests, byPurposeBase)
-    : byPurposeBase;
+  let byPurpose = byPurposeBase;
+  if (options?.includeDivisionBreakdown) {
+    byPurpose = attachDivisionBreakdown(requests, byPurpose);
+  } else if (options?.includeRequesterBreakdown) {
+    byPurpose = attachRequesterBreakdown(requests, byPurpose);
+  }
 
   return {
     totals: {

@@ -264,14 +264,16 @@ export function MarketingDashboard({
     [requests, filters]
   );
 
-  const viewingByDivision = filters.division !== ALL_FILTER;
+  const viewingAllDivisions = filters.division === ALL_FILTER;
+  const viewingByDivision = !viewingAllDivisions;
 
   const stats = useMemo(
     () =>
       buildMarketingDashboardStats(filteredRequests, {
+        includeDivisionBreakdown: viewingAllDivisions,
         includeRequesterBreakdown: viewingByDivision,
       }),
-    [filteredRequests, viewingByDivision]
+    [filteredRequests, viewingAllDivisions, viewingByDivision]
   );
 
   const clearFilters = () => {
@@ -358,6 +360,11 @@ export function MarketingDashboard({
         onExport={handleExport}
       />
 
+      {viewingAllDivisions && (
+        <p className="text-xs text-violet-800 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          All divisions — division totals appear under each purpose below.
+        </p>
+      )}
       {viewingByDivision && (
         <p className="text-xs text-violet-800 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
           Viewing <span className="font-bold">{filters.division}</span> — requester totals appear under each purpose below.
@@ -483,6 +490,26 @@ export function MarketingDashboard({
                       <td className="py-2.5 pr-3 text-right font-bold tabular-nums">{row.requests}</td>
                       <td className="py-2.5 text-right font-bold tabular-nums text-gray-700">{row.items}</td>
                     </tr>
+                    {viewingAllDivisions &&
+                      row.byDivision?.map((divisionRow) => (
+                        <tr
+                          key={`${row.purposeKey}:${divisionRow.division}`}
+                          className="border-t border-gray-50 bg-gray-50/60"
+                        >
+                          <td className="py-2 pl-6 pr-3 text-sm text-gray-700">
+                            <span className="text-gray-400 mr-2" aria-hidden="true">
+                              └
+                            </span>
+                            {divisionRow.division}
+                          </td>
+                          <td className="py-2 pr-3 text-right text-sm font-semibold tabular-nums text-gray-700">
+                            {divisionRow.requests}
+                          </td>
+                          <td className="py-2 text-right text-sm font-semibold tabular-nums text-gray-600">
+                            {divisionRow.items}
+                          </td>
+                        </tr>
+                      ))}
                     {viewingByDivision &&
                       row.byRequester?.map((requester) => (
                         <tr
