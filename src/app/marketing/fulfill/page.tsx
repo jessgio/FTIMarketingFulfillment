@@ -206,7 +206,12 @@ function MarketingFulfillPageContent() {
     }
   };
 
+  const moduleTabInitializedRef = useRef(false);
   useEffect(() => {
+    if (!moduleTabInitializedRef.current) {
+      moduleTabInitializedRef.current = true;
+      return;
+    }
     setSelectedIds([]);
     setViewingRequestId(null);
   }, [moduleTab]);
