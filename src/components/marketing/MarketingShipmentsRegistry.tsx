@@ -7,13 +7,14 @@ import {
   updateMarketingActualShippingLabel,
   updateMarketingRequestPurpose,
 } from "../../lib/marketingDb";
+import { BiteshipStatusBadge } from "./MarketingBiteshipBooking";
+import { canFulfill } from "../../lib/marketingRoles";
 import {
   courierNeedsActualShippingLabel,
   MARKETING_COURIERS_WITH_SHIPPING_LABEL,
   type MarketingRequest,
   type MarketingSession,
 } from "../../types/marketing";
-import { canFulfill } from "../../lib/marketingRoles";
 
 const statusStyles: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -404,11 +405,18 @@ export function MarketingShipmentsRegistry({
                         mono
                         error={cellErrors[cellErrorKey(req.id, "label")]}
                         savedMeta={
-                          req.actual_shipping_label_at ? (
-                            <p className="text-[10px] text-gray-500">
-                              {req.actual_shipping_label_by} · {formatWhen(req.actual_shipping_label_at)}
-                            </p>
-                          ) : undefined
+                          <>
+                            {req.biteship_status && (
+                              <p className="text-[10px] text-emerald-700">
+                                <BiteshipStatusBadge request={req} />
+                              </p>
+                            )}
+                            {req.actual_shipping_label_at && (
+                              <p className="text-[10px] text-gray-500">
+                                {req.actual_shipping_label_by} · {formatWhen(req.actual_shipping_label_at)}
+                              </p>
+                            )}
+                          </>
                         }
                         onDraftChange={(value) =>
                           setLabelDrafts((prev) => ({ ...prev, [req.id]: value }))

@@ -1,10 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, Printer, Trash2, X } from "lucide-react";
+import { Loader2, Printer, Trash2, Truck, X } from "lucide-react";
 import { DashButton, cx } from "../dashboard/primitives";
 import { RequestChat } from "./RequestChat";
+import {
+  BiteshipStatusBadge,
+  canBookViaBiteship,
+  MarketingBiteshipBookingModal,
+} from "./MarketingBiteshipBooking";
+import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
+import { canFulfill } from "../../lib/marketingRoles";
 import {
   courierNeedsActualShippingLabel,
   type MarketingRequest,
@@ -41,6 +48,7 @@ export function MarketingRequestDetailModal({
   onDelete,
   deleting = false,
   defaultChatOpen = false,
+  onUpdated,
 }: {
   request: MarketingRequest;
   onClose: () => void;
@@ -50,8 +58,16 @@ export function MarketingRequestDetailModal({
   onDelete?: () => void;
   deleting?: boolean;
   defaultChatOpen?: boolean;
+  onUpdated?: () => void;
 }) {
+  const [showBiteshipBooking, setShowBiteshipBooking] = useState(false);
+  const canBook =
+    Boolean(session && canFulfill(session)) &&
+    canBookViaBiteship(request) &&
+    !request.biteship_order_id;
+
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40"
       onClick={onClose}
@@ -104,13 +120,14 @@ export function MarketingRequestDetailModal({
             <p>{request.country}</p>
           </DetailRow>
 
-          {(request.preferred_courier || request.due_date) && (
+          {(request.preferred_courier || request.due_date || request.biteship_status) && (
             <div className="flex flex-wrap gap-2">
               {request.preferred_courier && (
                 <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-violet-100 text-violet-800">
                   {request.preferred_courier}
                 </span>
               )}
+              <BiteshipStatusBadge request={request} />
               {request.due_date && (
                 <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-900">
                   Due {new Date(request.due_date + "T12:00:00").toLocaleDateString()}
@@ -158,6 +175,23 @@ export function MarketingRequestDetailModal({
             </DetailRow>
           </div>
 
+          {(request.biteship_order_id || request.biteship_status) && (
+            <DetailRow label="Biteship">
+              <p className="font-semibold capitalize">{formatBiteshipStatus(request.biteship_status)}</p>
+              {request.biteship_courier_company && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {request.biteship_courier_company}/{request.biteship_courier_type ?? "—"}
+                  {request.biteship_booked_by ? ` · booked by ${request.biteship_booked_by}` : ""}
+                </p>
+              )}
+              {request.biteship_status_updated_at && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Updated {formatWhen(request.biteship_status_updated_at)}
+                </p>
+              )}
+            </DetailRow>
+          )}
+
           {courierNeedsActualShippingLabel(request.preferred_courier) && (
             <DetailRow label="Actual shipping label">
               {request.actual_shipping_label ? (
@@ -186,6 +220,17 @@ export function MarketingRequestDetailModal({
           />
 
           <div className="flex flex-col gap-2">
+            {canBook && session && (
+              <DashButton
+                type="button"
+                variant="success"
+                size="md"
+                className="w-full"
+                onClick={() => setShowBiteshipBooking(true)}
+              >
+                <Truck className="w-4 h-4" /> Book via Biteship
+              </DashButton>
+            )}
             <Link href={`/marketing/labels/${request.id}`} className="block">
               <DashButton variant="primary" size="md" className="w-full">
                 <Printer className="w-4 h-4" /> Reprint label
@@ -212,5 +257,18 @@ export function MarketingRequestDetailModal({
         </div>
       </div>
     </div>
+
+      {showBiteshipBooking && session && (
+        <MarketingBiteshipBookingModal
+          request={request}
+          session={session}
+          onClose={() => setShowBiteshipBooking(false)}
+          onBooked={() => {
+            setShowBiteshipBooking(false);
+            onUpdated?.();
+          }}
+        />
+      )}
+    </>
   );
 }

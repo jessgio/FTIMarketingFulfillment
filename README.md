@@ -47,3 +47,19 @@ npm run dev
 | `LARK_WEBHOOK_URL` | For Lark | Custom bot webhook for chat mentions (`@handle`) |
 | `LARK_ALERTS_WEBHOOK_URL` | Optional | Separate webhook for shipped alerts; falls back to `LARK_WEBHOOK_URL` |
 | `LARK_WEBHOOK_SECRET` | Optional | HMAC signature for Lark webhooks |
+
+## Biteship integration
+
+Warehouse staff can book **Instant**, **Same Day**, **Regular**, and **Kargo** shipments to Indonesia directly from `/marketing/fulfill`. AWB populates in **Actual shipping label** when Biteship confirms the order; webhooks keep status and AWB in sync.
+
+### Setup
+
+1. Run migration `20260615120000_012_biteship_integration.sql` in Supabase.
+2. Add Biteship env vars from `.env.example` (API key + warehouse origin address).
+3. In [Biteship Integrations → Webhook](https://dashboard.biteship.com/integrations), add:
+   - **URL:** `https://<your-domain>/api/biteship/webhook`
+   - **Events:** `order.status`, `order.waybill_id`
+   - **Headers (optional):** set `x-webhook-secret` (or your chosen header name) to match `BITESHIP_WEBHOOK_SECRET`.
+4. Deploy with env vars on Vercel.
+
+International couriers (Rayspeed, UPS, DHL, FedEx) continue to use manual AWB entry in the shipment registry.

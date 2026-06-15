@@ -23,11 +23,29 @@ export const MARKETING_COURIERS_WITH_SHIPPING_LABEL = [
   "FedEx",
 ] as const satisfies readonly MarketingCourier[];
 
+/** Domestic couriers booked through Biteship (Indonesia). */
+export const MARKETING_COURIERS_WITH_BITESHIP = [
+  "Instant",
+  "Same Day",
+  "Regular",
+  "Kargo",
+] as const satisfies readonly MarketingCourier[];
+
 export function courierNeedsActualShippingLabel(
   courier: MarketingCourier | null | undefined
 ): boolean {
   if (!courier) return false;
   return (MARKETING_COURIERS_WITH_SHIPPING_LABEL as readonly string[]).includes(courier);
+}
+
+export function courierUsesBiteship(courier: MarketingCourier | null | undefined): boolean {
+  if (!courier) return false;
+  return (MARKETING_COURIERS_WITH_BITESHIP as readonly string[]).includes(courier);
+}
+
+export function isIndonesiaShipment(country: string | null | undefined): boolean {
+  const normalized = country?.trim().toLowerCase() ?? "";
+  return normalized === "indonesia" || normalized === "id";
 }
 
 export type MarketingUserRole = "requester" | "fulfillment" | "admin";
@@ -118,6 +136,13 @@ export interface MarketingRequest {
   actual_shipping_label: string | null;
   actual_shipping_label_at: string | null;
   actual_shipping_label_by: string | null;
+  biteship_order_id: string | null;
+  biteship_status: string | null;
+  biteship_courier_company: string | null;
+  biteship_courier_type: string | null;
+  biteship_booked_at: string | null;
+  biteship_booked_by: string | null;
+  biteship_status_updated_at: string | null;
   created_at: string;
   items?: MarketingRequestItem[];
 }

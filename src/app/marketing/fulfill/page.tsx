@@ -23,6 +23,11 @@ import { MarketingChatNotifications } from "../../../components/marketing/Market
 import { MarketingNewOrdersBadge } from "../../../components/marketing/MarketingNewOrdersBadge";
 import { MarketingRequestDetailModal } from "../../../components/marketing/MarketingRequestDetailModal";
 import { MarketingShipmentsRegistry } from "../../../components/marketing/MarketingShipmentsRegistry";
+import {
+  BiteshipStatusBadge,
+  canBookViaBiteship,
+  MarketingBiteshipBookingModal,
+} from "../../../components/marketing/MarketingBiteshipBooking";
 import { RequestChat } from "../../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../../hooks/useMarketingChatUnread";
@@ -112,6 +117,7 @@ function MarketingFulfillPageContent() {
   const [deepLinkChatOpen, setDeepLinkChatOpen] = useState(false);
   const [deepLinkLoading, setDeepLinkLoading] = useState(false);
   const [deepLinkedRequest, setDeepLinkedRequest] = useState<MarketingRequest | null>(null);
+  const [biteshipBookingRequest, setBiteshipBookingRequest] = useState<MarketingRequest | null>(null);
   const { totalUnread, unreadByRequestId, refreshUnread } = useMarketingChatUnread(chatSession);
   const { totalUnseen, unseenByRequestId, refreshUnseen } = useMarketingUnseenOrders(chatSession);
 
@@ -771,13 +777,14 @@ function MarketingFulfillPageContent() {
                   </span>
                 </div>
 
-                {(req.preferred_courier || req.due_date) && (
+                {(req.preferred_courier || req.due_date || req.biteship_status) && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {req.preferred_courier && (
                       <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-violet-100 text-violet-800">
                         {req.preferred_courier}
                       </span>
                     )}
+                    <BiteshipStatusBadge request={req} />
                     {req.due_date && (
                       <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-900">
                         Due {new Date(req.due_date + "T12:00:00").toLocaleDateString()}
@@ -800,6 +807,12 @@ function MarketingFulfillPageContent() {
                 {req.notes && (
                   <p className="text-xs bg-amber-50 text-amber-900 border border-amber-100 rounded-lg px-3 py-2 mb-4">
                     {req.notes}
+                  </p>
+                )}
+
+                {req.actual_shipping_label && (
+                  <p className="text-xs font-mono font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-4">
+                    AWB {req.actual_shipping_label}
                   </p>
                 )}
 
@@ -826,14 +839,28 @@ function MarketingFulfillPageContent() {
                     </DashButton>
                   </Link>
                   {req.status === "packed" && (
-                    <DashButton
-                      variant="success"
-                      size="md"
-                      onClick={() => handleMarkShipped(req.id)}
-                      className="flex-1 min-w-[120px]"
-                    >
-                      <Truck className="w-4 h-4" /> Shipped
-                    </DashButton>
+                    <>
+                      {chatSession &&
+                        canBookViaBiteship(req) &&
+                        !req.biteship_order_id && (
+                          <DashButton
+                            variant="success"
+                            size="md"
+                            onClick={() => setBiteshipBookingRequest(req)}
+                            className="flex-1 min-w-[120px]"
+                          >
+                            <Truck className="w-4 h-4" /> Book via Biteship
+                          </DashButton>
+                        )}
+                      <DashButton
+                        variant="success"
+                        size="md"
+                        onClick={() => handleMarkShipped(req.id)}
+                        className="flex-1 min-w-[120px]"
+                      >
+                        <Truck className="w-4 h-4" /> Shipped
+                      </DashButton>
+                    </>
                   )}
                 </div>
               </SurfaceCard>
@@ -947,6 +974,18 @@ function MarketingFulfillPageContent() {
         </div>
       )}
 
+      {biteshipBookingRequest && chatSession && (
+        <MarketingBiteshipBookingModal
+          request={biteshipBookingRequest}
+          session={chatSession}
+          onClose={() => setBiteshipBookingRequest(null)}
+          onBooked={() => {
+            setBiteshipBookingRequest(null);
+            void loadQueue(true);
+          }}
+        />
+      )}
+
       {viewingRequest && (
         <MarketingRequestDetailModal
           request={viewingRequest}
@@ -964,6 +1003,7 @@ function MarketingFulfillPageContent() {
               ? () => handleDeleteRequest(viewingRequest)
               : undefined
           }
+          onUpdated={() => loadQueue(true)}
           deleting={deletingId === viewingRequest.id}
         />
       )}
