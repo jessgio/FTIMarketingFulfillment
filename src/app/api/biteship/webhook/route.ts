@@ -3,6 +3,27 @@ import type { BiteshipWebhookPayload } from "../../../../lib/biteship";
 import { verifyBiteshipWebhook } from "../../../../lib/biteship";
 import { supabase } from "../../../../lib/supabaseClient";
 
+function installationOkResponse() {
+  return NextResponse.json({ ok: true, success: true });
+}
+
+function isInstallationProbe(rawBody: string): boolean {
+  const trimmed = rawBody.trim();
+  if (!trimmed) return true;
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed === null) return true;
+    if (typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length === 0) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
 async function findRequestForWebhook(payload: BiteshipWebhookPayload) {
   if (payload.order_id) {
     const { data } = await supabase
@@ -25,18 +46,29 @@ async function findRequestForWebhook(payload: BiteshipWebhookPayload) {
   return null;
 }
 
+/** Biteship pings the URL during setup; respond OK without validation. */
+export async function GET() {
+  return installationOkResponse();
+}
+
 export async function POST(request: Request) {
+  const rawBody = await request.text();
+
+  if (isInstallationProbe(rawBody)) {
+    return installationOkResponse();
+  }
+
   if (!verifyBiteshipWebhook(request)) {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
   }
 
   try {
-    const payload = (await request.json()) as BiteshipWebhookPayload;
+    const payload = JSON.parse(rawBody) as BiteshipWebhookPayload;
     const requestId = await findRequestForWebhook(payload);
 
     if (!requestId) {
       console.warn("biteship webhook: no matching marketing request", payload);
-      return NextResponse.json({ success: true, ignored: true });
+      return NextResponse.json({ ok: true, success: true, ignored: true });
     }
 
     const now = new Date().toISOString();
@@ -74,7 +106,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, requestId, event: payload.event });
+    return NextResponse.json({ ok: true, success: true, requestId, event: payload.event });
   } catch (err: unknown) {
     console.error("biteship webhook error:", err);
     return NextResponse.json(

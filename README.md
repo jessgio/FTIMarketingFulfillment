@@ -59,7 +59,7 @@ Warehouse staff can book **Instant**, **Same Day**, **Regular**, and **Kargo** s
 3. In [Biteship Integrations → Webhook](https://dashboard.biteship.com/integrations), add:
    - **URL:** `https://<your-domain>/api/biteship/webhook`
    - **Events:** `order.status`, `order.waybill_id`
-   - **Headers (optional):** set `x-webhook-secret` (or your chosen header name) to match `BITESHIP_WEBHOOK_SECRET`.
+   - **Headers (optional):** add after installation succeeds — set `x-webhook-secret` (or your chosen header name) to match `BITESHIP_WEBHOOK_SECRET`. Leave headers empty during setup; the endpoint accepts empty POST bodies for Biteship's install check.
 4. Deploy with env vars on Vercel.
 
 International couriers (Rayspeed, UPS, DHL, FedEx) continue to use manual AWB entry in the shipment registry.
