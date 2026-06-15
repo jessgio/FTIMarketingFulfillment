@@ -2,6 +2,7 @@
 
 import { ChevronRight, X } from "lucide-react";
 import { SurfaceCard, cx } from "../dashboard/primitives";
+import { MarketingShipmentTrackingSummary } from "./MarketingShipmentTracking";
 import type { MarketingRequest } from "../../types/marketing";
 
 const statusStyles: Record<string, string> = {
@@ -73,6 +74,9 @@ export function MarketingDashboardMetricOrders({
                     {" · "}
                     {countItems(req)} item{countItems(req) === 1 ? "" : "s"}
                   </p>
+                  <div className="mt-2">
+                    <MarketingShipmentTrackingSummary request={req} compact />
+                  </div>
                 </div>
                 <span
                   className={cx(

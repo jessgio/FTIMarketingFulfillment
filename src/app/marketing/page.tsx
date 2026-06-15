@@ -51,6 +51,7 @@ import {
 import { MarketingChatNotifications } from "../../components/marketing/MarketingChatNotifications";
 import { MarketingDashboard } from "../../components/marketing/MarketingDashboard";
 import { MarketingRequestDetailModal } from "../../components/marketing/MarketingRequestDetailModal";
+import { MarketingShipmentTrackingSummary } from "../../components/marketing/MarketingShipmentTracking";
 import { MarketingPortalShipmentsPanel } from "../../components/marketing/MarketingPortalShipmentsPanel";
 import { MarketingSummaryPanel } from "../../components/marketing/MarketingSummaryPanel";
 import { MarketingAddressFields } from "../../components/marketing/MarketingAddressFields";
@@ -1152,6 +1153,9 @@ function MarketingPageContent() {
                           </p>
                         )}
                         <p className="text-xs font-mono text-gray-600 mt-1">{req.barcode}</p>
+                        <div className="mt-2">
+                          <MarketingShipmentTrackingSummary request={req} compact />
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <StatusBadge status={req.status} />

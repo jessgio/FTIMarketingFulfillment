@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, Loader2, TableProperties } from "lucide-react";
 import { SurfaceCard, cx } from "../dashboard/primitives";
+import { MarketingShipmentTrackingSummary } from "./MarketingShipmentTracking";
 import { MarketingSummaryFilterBar } from "./MarketingSummaryFilterBar";
 import { downloadMarketingHistoryExport } from "../../lib/marketingExport";
 import {
@@ -133,7 +134,7 @@ export function MarketingSummaryPanel({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1180px]">
+            <table className="w-full text-sm min-w-[1280px]">
               <thead className="bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wide text-gray-600">
                 <tr>
                   <th className="px-3 py-3">Status</th>
@@ -144,6 +145,7 @@ export function MarketingSummaryPanel({
                   <th className="px-3 py-3 min-w-[140px]">Purpose</th>
                   <th className="px-3 py-3">Recipient</th>
                   <th className="px-3 py-3">Courier</th>
+                  <th className="px-3 py-3 min-w-[160px]">Delivery status</th>
                   <th className="px-3 py-3">Due</th>
                   <th className="px-3 py-3 min-w-[180px]">Product</th>
                   <th className="px-3 py-3">SKU</th>
@@ -208,6 +210,9 @@ export function MarketingSummaryPanel({
                             </td>
                             <td className="px-3 py-3 align-top text-gray-800 whitespace-nowrap" rowSpan={rowSpan}>
                               {req.preferred_courier ?? "—"}
+                            </td>
+                            <td className="px-3 py-3 align-top" rowSpan={rowSpan}>
+                              <MarketingShipmentTrackingSummary request={req} compact />
                             </td>
                             <td className="px-3 py-3 align-top text-gray-700 whitespace-nowrap" rowSpan={rowSpan}>
                               {formatDue(req.due_date)}

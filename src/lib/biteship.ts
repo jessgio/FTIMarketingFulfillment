@@ -306,6 +306,136 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
 
 export type BiteshipWebhookEvent = "order.status" | "order.waybill_id" | "order.price";
 
+export interface BiteshipTrackingHistoryEntry {
+  status: string;
+  note: string;
+  updated_at: string;
+  service_type?: string;
+}
+
+export interface BiteshipTrackingDetails {
+  status: string;
+  waybill_id: string | null;
+  courier_company: string | null;
+  courier_name: string | null;
+  driver_name: string | null;
+  driver_phone: string | null;
+  origin_address: string | null;
+  destination_address: string | null;
+  link: string | null;
+  history: BiteshipTrackingHistoryEntry[];
+}
+
+type RawBiteshipTracking = {
+  status?: string;
+  waybill_id?: string | null;
+  link?: string | null;
+  courier?: {
+    company?: string;
+    name?: string;
+    driver_name?: string | null;
+    driver_phone?: string | null;
+    tracking_id?: string | null;
+    waybill_id?: string | null;
+  };
+  origin?: { contact_name?: string; address?: string };
+  destination?: { contact_name?: string; address?: string };
+  history?: BiteshipTrackingHistoryEntry[];
+};
+
+function normalizeTrackingDetails(raw: RawBiteshipTracking): BiteshipTrackingDetails {
+  return {
+    status: raw.status ?? "unknown",
+    waybill_id: raw.waybill_id ?? raw.courier?.waybill_id ?? null,
+    courier_company: raw.courier?.company ?? null,
+    courier_name: raw.courier?.name ?? null,
+    driver_name: raw.courier?.driver_name ?? null,
+    driver_phone: raw.courier?.driver_phone ?? null,
+    origin_address: raw.origin?.address ?? null,
+    destination_address: raw.destination?.address ?? null,
+    link: raw.link ?? null,
+    history: (raw.history ?? []).slice().sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    ),
+  };
+}
+
+async function biteshipGet<T>(path: string): Promise<T> {
+  const apiKey = process.env.BITESHIP_API_KEY?.trim();
+  if (!apiKey) {
+    throw new BiteshipApiError("BITESHIP_API_KEY is not configured.");
+  }
+
+  const response = await fetch(`${BITESHIP_API_BASE}${path}`, {
+    method: "GET",
+    headers: {
+      authorization: apiKey,
+    },
+  });
+
+  const payload = (await response.json()) as T & {
+    success?: boolean;
+    error?: string;
+    message?: string;
+    code?: number;
+  };
+
+  if (!response.ok || payload.success === false) {
+    throw new BiteshipApiError(
+      payload.error || payload.message || `Biteship request failed (${response.status})`,
+      response.status,
+      payload.code
+    );
+  }
+
+  return payload;
+}
+
+export async function fetchBiteshipTrackingDetails(input: {
+  biteshipOrderId?: string | null;
+  waybillId?: string | null;
+  courierCompany?: string | null;
+}): Promise<BiteshipTrackingDetails | null> {
+  const waybill = input.waybillId?.trim() || null;
+  let courierCompany = input.courierCompany?.trim() || null;
+  let trackingId: string | null = null;
+
+  if (input.biteshipOrderId?.trim()) {
+    try {
+      const order = await biteshipGet<RawBiteshipTracking & { courier?: { tracking_id?: string; company?: string; waybill_id?: string } }>(
+        `/orders/${encodeURIComponent(input.biteshipOrderId.trim())}`
+      );
+      trackingId = order.courier?.tracking_id?.trim() || null;
+      courierCompany = courierCompany ?? order.courier?.company?.trim() ?? null;
+      if (order.status || order.history?.length) {
+        return normalizeTrackingDetails(order);
+      }
+    } catch {
+      /* fall through to tracking endpoints */
+    }
+  }
+
+  if (trackingId) {
+    try {
+      const tracking = await biteshipGet<RawBiteshipTracking>(
+        `/trackings/${encodeURIComponent(trackingId)}`
+      );
+      return normalizeTrackingDetails(tracking);
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (waybill && courierCompany) {
+    const tracking = await biteshipGet<RawBiteshipTracking>(
+      `/trackings/${encodeURIComponent(waybill)}/couriers/${encodeURIComponent(courierCompany)}`
+    );
+    return normalizeTrackingDetails(tracking);
+  }
+
+  return null;
+}
+
 export interface BiteshipWebhookPayload {
   event?: BiteshipWebhookEvent;
   order_id?: string;

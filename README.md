@@ -63,3 +63,5 @@ Warehouse staff can book **Instant**, **Same Day**, **Regular**, and **Kargo** s
 4. Deploy with env vars on Vercel.
 
 International couriers (Rayspeed, UPS, DHL, FedEx) continue to use manual AWB entry in the shipment registry.
+
+Marketing users can open **Track shipment** from the Shipments or Summary tabs, or visit `/marketing/track/[requestId]` for live Biteship history when available.

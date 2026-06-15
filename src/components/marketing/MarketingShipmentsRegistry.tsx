@@ -8,6 +8,7 @@ import {
   updateMarketingRequestPurpose,
 } from "../../lib/marketingDb";
 import { BiteshipStatusBadge } from "./MarketingBiteshipBooking";
+import { MarketingShipmentTrackingSummary } from "./MarketingShipmentTracking";
 import { canFulfill } from "../../lib/marketingRoles";
 import {
   courierNeedsActualShippingLabel,
@@ -261,7 +262,7 @@ export function MarketingShipmentsRegistry({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[1040px]">
+        <table className="w-full text-sm min-w-[1220px]">
           <thead className="bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wide text-gray-600">
             <tr>
               {selectable && (
@@ -284,6 +285,7 @@ export function MarketingShipmentsRegistry({
               <th className="px-3 py-3 min-w-[180px]">Purpose</th>
               <th className="px-3 py-3 text-right">Items</th>
               <th className="px-3 py-3">Shipped</th>
+              <th className="px-3 py-3 min-w-[180px]">Delivery status</th>
               <th className="px-3 py-3 min-w-[220px]">Actual shipping label</th>
               <th className="px-3 py-3 w-8" aria-hidden="true" />
             </tr>
@@ -390,6 +392,9 @@ export function MarketingShipmentsRegistry({
                     ) : (
                       "—"
                     )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <MarketingShipmentTrackingSummary request={req} compact />
                   </td>
                   <td className="px-3 py-3">
                     {!needsLabel ? (

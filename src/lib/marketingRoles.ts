@@ -44,3 +44,11 @@ export function roleLabel(role: MarketingUserRole): string {
   if (role === "fulfillment") return "Fulfillment";
   return "Requester";
 }
+
+export function canViewMarketingRequest(
+  session: MarketingSession,
+  req: MarketingRequest
+): boolean {
+  if (canFulfill(session) || isAdmin(session)) return true;
+  return req.requested_by_email.trim().toLowerCase() === session.email.trim().toLowerCase();
+}

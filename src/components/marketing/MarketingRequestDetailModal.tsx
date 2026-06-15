@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, Printer, Trash2, Truck, X } from "lucide-react";
+import { Loader2, Printer, Trash2, Truck, X, ExternalLink } from "lucide-react";
 import { DashButton, cx } from "../dashboard/primitives";
 import { RequestChat } from "./RequestChat";
 import {
@@ -10,8 +10,13 @@ import {
   canBookViaBiteship,
   MarketingBiteshipBookingModal,
 } from "./MarketingBiteshipBooking";
+import { MarketingShipmentTrackingSummary } from "./MarketingShipmentTracking";
 import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
 import { canFulfill } from "../../lib/marketingRoles";
+import {
+  isTrackableShipment,
+  marketingTrackingPagePath,
+} from "../../lib/shipmentTracking";
 import {
   courierNeedsActualShippingLabel,
   type MarketingRequest,
@@ -210,6 +215,12 @@ export function MarketingRequestDetailModal({
             </DetailRow>
           )}
 
+          {isTrackableShipment(request) && (
+            <DetailRow label="Delivery tracking">
+              <MarketingShipmentTrackingSummary request={request} showLink />
+            </DetailRow>
+          )}
+
           <RequestChat
             requestId={request.id}
             packageLabel={`${request.recipient_name} · ${request.barcode}`}
@@ -220,6 +231,13 @@ export function MarketingRequestDetailModal({
           />
 
           <div className="flex flex-col gap-2">
+            {isTrackableShipment(request) && (
+              <Link href={marketingTrackingPagePath(request.id)} className="block">
+                <DashButton variant="subtle" size="md" className="w-full">
+                  <ExternalLink className="w-4 h-4" /> Open tracking page
+                </DashButton>
+              </Link>
+            )}
             {canBook && session && (
               <DashButton
                 type="button"
