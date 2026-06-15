@@ -137,3 +137,71 @@ export function buildShippedLarkCard(opts: {
     elements: [markdownDiv(metadata), openButton("Open fulfillment", packageUrl)],
   };
 }
+
+function formatDueDate(dueDate: string | null | undefined): string | null {
+  if (!dueDate?.trim()) return null;
+  return new Date(`${dueDate.trim()}T12:00:00`).toLocaleDateString("en-SG", {
+    timeZone: "Asia/Singapore",
+  });
+}
+
+function formatItemsSummary(items: Array<{ product_name: string; qty: number }>): string | null {
+  if (!items.length) return null;
+  const summary = items
+    .map((item) => `${item.qty}× ${item.product_name.trim()}`)
+    .join(", ")
+    .slice(0, 500);
+  return summary || null;
+}
+
+export function buildNewRequestLarkCard(opts: {
+  barcode: string;
+  recipientName: string;
+  requestedByName: string;
+  requestedByDivision: string | null;
+  dueDate: string | null;
+  preferredCourier: string | null;
+  requestPurpose: string | null;
+  itemsSummary: string | null;
+  notes: string | null;
+  packageUrl: string;
+}): LarkInteractiveCard {
+  const {
+    barcode,
+    recipientName,
+    requestedByName,
+    requestedByDivision,
+    dueDate,
+    preferredCourier,
+    requestPurpose,
+    itemsSummary,
+    notes,
+    packageUrl,
+  } = opts;
+
+  const metadata = metadataLines([
+    ["Barcode", barcode],
+    ["Recipient", recipientName],
+    ["Requested by", requestedByName],
+    ["Division", requestedByDivision],
+    ["Due", formatDueDate(dueDate)],
+    ["Courier", preferredCourier],
+    ["Purpose", requestPurpose],
+    ["Items", itemsSummary],
+    ["Notes", notes?.trim() || null],
+  ]);
+
+  return {
+    config: {
+      wide_screen_mode: true,
+    },
+    header: {
+      template: "orange",
+      title: {
+        tag: "plain_text",
+        content: "📋 New marketing request",
+      },
+    },
+    elements: [markdownDiv(metadata), openButton("Open request", packageUrl)],
+  };
+}

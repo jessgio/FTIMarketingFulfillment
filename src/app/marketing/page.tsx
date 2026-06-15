@@ -42,6 +42,7 @@ import {
   searchProducts,
   updateMarketingRequest,
 } from "../../lib/marketingDb";
+import { notifyNewMarketingRequest } from "../../lib/marketingNotify";
 import {
   downloadMarketingImportTemplate,
   parseMarketingImportCsv,
@@ -472,6 +473,11 @@ function MarketingPageContent() {
         setImportPackages([]);
         setImportFileName("");
         await loadRequests();
+        for (const request of created) {
+          notifyNewMarketingRequest(request.id).catch((err) =>
+            console.warn("Lark new request notify failed:", err)
+          );
+        }
       }
       if (errors.length > 0) {
         setImportErrors(errors);
@@ -523,6 +529,9 @@ function MarketingPageContent() {
       } else {
         const created = await createMarketingRequest(session, payload);
         setSubmitSuccess(`Request submitted. Barcode ${created.barcode} — the offline team will print the shipping label.`);
+        notifyNewMarketingRequest(created.id).catch((err) =>
+          console.warn("Lark new request notify failed:", err)
+        );
       }
 
       resetForm();
