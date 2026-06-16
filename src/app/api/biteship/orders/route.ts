@@ -98,6 +98,7 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString();
     const waybill = order.waybillId?.trim() || null;
+    const routingCode = order.routingCode?.trim() || null;
 
     const { data: updated, error: updateError } = await supabase
       .from("marketing_requests")
@@ -109,6 +110,7 @@ export async function POST(request: Request) {
         biteship_booked_at: now,
         biteship_booked_by: bookedBy,
         biteship_status_updated_at: now,
+        ...(routingCode ? { biteship_routing_code: routingCode } : {}),
         ...(waybill
           ? {
               actual_shipping_label: waybill,

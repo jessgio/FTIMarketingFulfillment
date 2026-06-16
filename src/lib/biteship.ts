@@ -189,6 +189,7 @@ export interface BiteshipCreateOrderInput {
 export interface BiteshipOrderResult {
   orderId: string;
   waybillId: string | null;
+  routingCode: string | null;
   status: string;
   courierCompany: string;
   courierType: string;
@@ -286,6 +287,7 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
     price?: number;
     courier?: {
       waybill_id?: string | null;
+      routing_code?: string | null;
       company?: string;
       type?: string;
     };
@@ -297,10 +299,41 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
   return {
     orderId: result.id,
     waybillId: result.courier?.waybill_id ?? null,
+    routingCode: result.courier?.routing_code?.trim() || null,
     status: result.status,
     courierCompany: result.courier?.company ?? courierCompany,
     courierType: result.courier?.type ?? courierType,
     price: result.price ?? null,
+  };
+}
+
+export interface BiteshipOrderLabelFields {
+  waybillId: string | null;
+  routingCode: string | null;
+  courierCompany: string | null;
+  courierType: string | null;
+  status: string | null;
+}
+
+export async function fetchBiteshipOrderLabelFields(
+  biteshipOrderId: string
+): Promise<BiteshipOrderLabelFields> {
+  const order = await biteshipGet<{
+    status?: string;
+    courier?: {
+      waybill_id?: string | null;
+      routing_code?: string | null;
+      company?: string;
+      type?: string;
+    };
+  }>(`/orders/${encodeURIComponent(biteshipOrderId.trim())}`);
+
+  return {
+    waybillId: order.courier?.waybill_id?.trim() || null,
+    routingCode: order.courier?.routing_code?.trim() || null,
+    courierCompany: order.courier?.company?.trim() || null,
+    courierType: order.courier?.type?.trim() || null,
+    status: order.status ?? null,
   };
 }
 

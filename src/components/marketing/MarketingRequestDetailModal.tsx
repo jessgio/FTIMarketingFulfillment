@@ -12,6 +12,7 @@ import {
 } from "./MarketingBiteshipBooking";
 import { MarketingShipmentTrackingSummary } from "./MarketingShipmentTracking";
 import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
+import { biteshipLabelPagePath, canPrintBiteshipLabel } from "../../lib/biteshipLabelData";
 import { canFulfill } from "../../lib/marketingRoles";
 import {
   isTrackableShipment,
@@ -251,9 +252,16 @@ export function MarketingRequestDetailModal({
             )}
             <Link href={`/marketing/labels/${request.id}`} className="block">
               <DashButton variant="primary" size="md" className="w-full">
-                <Printer className="w-4 h-4" /> Reprint label
+                <Printer className="w-4 h-4" /> Reprint packing label
               </DashButton>
             </Link>
+            {canPrintBiteshipLabel(request) && (
+              <Link href={biteshipLabelPagePath(request.id)} className="block">
+                <DashButton variant="success" size="md" className="w-full">
+                  <Truck className="w-4 h-4" /> Print carrier label
+                </DashButton>
+              </Link>
+            )}
             {onDelete && (
               <DashButton
                 type="button"

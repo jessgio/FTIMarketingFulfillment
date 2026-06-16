@@ -54,6 +54,7 @@ import {
   markMarketingRequestShipped,
 } from "../../../lib/marketingDb";
 import { downloadMarketingHistoryExport } from "../../../lib/marketingExport";
+import { biteshipLabelPagePath, canPrintBiteshipLabel } from "../../../lib/biteshipLabelData";
 import { isMarketingBarcode } from "../../../lib/marketingBarcode";
 import type { MarketingRequest } from "../../../types/marketing";
 
@@ -838,6 +839,13 @@ function MarketingFulfillPageContent() {
                       <Printer className="w-4 h-4" /> Print label
                     </DashButton>
                   </Link>
+                  {canPrintBiteshipLabel(req) && (
+                    <Link href={biteshipLabelPagePath(req.id)} className="flex-1 min-w-[120px]">
+                      <DashButton variant="success" size="md" className="w-full">
+                        <Truck className="w-4 h-4" /> Carrier label
+                      </DashButton>
+                    </Link>
+                  )}
                   {req.status === "packed" && (
                     <>
                       {chatSession &&

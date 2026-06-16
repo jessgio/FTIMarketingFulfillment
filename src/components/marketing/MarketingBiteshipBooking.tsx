@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Truck, X } from "lucide-react";
 import { DashButton, cx } from "../dashboard/primitives";
 import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
+import { biteshipLabelPagePath } from "../../lib/biteshipLabelData";
 import {
   courierUsesBiteship,
   isIndonesiaShipment,
@@ -131,6 +132,7 @@ export function MarketingBiteshipBookingModal({
         throw new Error(payload.error || "Failed to book shipment");
       }
 
+      window.open(biteshipLabelPagePath(request.id), "_blank", "noopener,noreferrer");
       onBooked();
       onClose();
     } catch (err: unknown) {
