@@ -59,6 +59,24 @@ export function biteshipLabelPagePath(requestId: string): string {
   return `/marketing/labels/biteship/${requestId}`;
 }
 
+export function biteshipLabelsBatchPagePath(ids: string[]): string {
+  return `/marketing/labels/biteship/batch?ids=${encodeURIComponent(ids.join(","))}`;
+}
+
+export function marketingPackingLabelsBatchPagePath(ids: string[]): string {
+  return `/marketing/labels/batch?ids=${encodeURIComponent(ids.join(","))}`;
+}
+
+export function requestIdsWithBiteshipLabels(
+  requests: MarketingRequest[],
+  ids: string[]
+): string[] {
+  const eligible = new Set(
+    requests.filter((req) => canPrintBiteshipLabel(req)).map((req) => req.id)
+  );
+  return ids.filter((id) => eligible.has(id));
+}
+
 export function canPrintBiteshipLabel(request: MarketingRequest): boolean {
   return Boolean(request.biteship_order_id);
 }

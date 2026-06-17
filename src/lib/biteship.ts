@@ -1,5 +1,5 @@
 import type { MarketingRequest } from "../types/marketing";
-import { biteshipCourierCodesForTier } from "./biteshipCouriers";
+import { biteshipCouriersParamForRequest } from "./biteshipCouriers";
 
 const BITESHIP_API_BASE = "https://api.biteship.com/v1";
 
@@ -133,8 +133,13 @@ export async function fetchBiteshipRates(request: MarketingRequest): Promise<Bit
     throw new BiteshipApiError("Destination postal code is required for Biteship rates.");
   }
 
-  const preferredCourier = request.preferred_courier ?? "Regular";
-  const couriers = biteshipCourierCodesForTier(preferredCourier).join(",");
+  const couriers = biteshipCouriersParamForRequest(request.preferred_courier);
+  if (!couriers) {
+    throw new BiteshipApiError(
+      "Biteship couriers are required for rate lookup but none were configured for this shipment."
+    );
+  }
+
   const packageSpec = getDefaultPackageSpec(request.items?.length ?? 1);
   const items = (request.items ?? []).map((item) => ({
     name: item.product_name.slice(0, 255),

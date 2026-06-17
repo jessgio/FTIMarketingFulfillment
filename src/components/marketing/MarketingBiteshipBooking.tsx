@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Truck, X } from "lucide-react";
+import { Loader2, Printer, Truck, X } from "lucide-react";
 import { DashButton, cx } from "../dashboard/primitives";
 import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
 import { biteshipLabelPagePath } from "../../lib/biteshipLabelData";
@@ -51,6 +51,7 @@ export function MarketingBiteshipBookingModal({
 }) {
   const [loadingRates, setLoadingRates] = useState(true);
   const [booking, setBooking] = useState(false);
+  const [booked, setBooked] = useState(false);
   const [error, setError] = useState("");
   const [rates, setRates] = useState<BiteshipRateRow[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -132,9 +133,8 @@ export function MarketingBiteshipBookingModal({
         throw new Error(payload.error || "Failed to book shipment");
       }
 
-      window.open(biteshipLabelPagePath(request.id), "_blank", "noopener,noreferrer");
+      setBooked(true);
       onBooked();
-      onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Booking failed");
     } finally {
@@ -170,6 +170,33 @@ export function MarketingBiteshipBookingModal({
         </div>
 
         <div className="px-5 py-5 space-y-4">
+          {booked ? (
+            <>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+                <p className="font-bold text-emerald-900">Shipment booked</p>
+                <p className="text-sm text-emerald-800 mt-1">
+                  Print the carrier label and affix it to the package. Mark the order shipped when it
+                  leaves the warehouse.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <DashButton
+                  variant="success"
+                  size="md"
+                  className="w-full"
+                  onClick={() =>
+                    window.open(biteshipLabelPagePath(request.id), "_blank", "noopener,noreferrer")
+                  }
+                >
+                  <Printer className="w-4 h-4" /> Print carrier label
+                </DashButton>
+                <DashButton variant="ghost" size="md" className="w-full" onClick={onClose}>
+                  Done — back to queue
+                </DashButton>
+              </div>
+            </>
+          ) : (
+            <>
           <p className="text-sm text-gray-600">
             Choose a courier rate. AWB will populate automatically when Biteship confirms the order.
           </p>
@@ -239,6 +266,8 @@ export function MarketingBiteshipBookingModal({
               Cancel
             </DashButton>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

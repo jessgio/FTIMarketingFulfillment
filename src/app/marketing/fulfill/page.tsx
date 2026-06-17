@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -45,16 +45,22 @@ import {
   deleteMarketingRequestsBulk,
   fetchAllMarketingRequestsForRegistry,
   fetchCompletedMarketingRequests,
+  fetchActiveFulfillmentQueue,
   fetchMarketingRequestByBarcode,
   fetchMarketingRequestById,
-  fetchPendingMarketingRequests,
   markMarketingRequestPacked,
   markMarketingRequestSeenByAdmin,
   markMarketingRequestsPackedBulk,
   markMarketingRequestShipped,
 } from "../../../lib/marketingDb";
 import { downloadMarketingHistoryExport } from "../../../lib/marketingExport";
-import { biteshipLabelPagePath, canPrintBiteshipLabel } from "../../../lib/biteshipLabelData";
+import {
+  biteshipLabelPagePath,
+  biteshipLabelsBatchPagePath,
+  canPrintBiteshipLabel,
+  marketingPackingLabelsBatchPagePath,
+  requestIdsWithBiteshipLabels,
+} from "../../../lib/biteshipLabelData";
 import { isMarketingBarcode } from "../../../lib/marketingBarcode";
 import type { MarketingRequest } from "../../../types/marketing";
 
@@ -132,12 +138,12 @@ function MarketingFulfillPageContent() {
       setError("");
     }
     try {
-      const [pending, completed, all] = await Promise.all([
-        fetchPendingMarketingRequests(),
+      const [activeQueue, completed, all] = await Promise.all([
+        fetchActiveFulfillmentQueue(),
         fetchCompletedMarketingRequests(),
         fetchAllMarketingRequestsForRegistry(),
       ]);
-      setRequests(pending);
+      setRequests(activeQueue);
       setCompletedRequests(completed);
       setAllRequests(all);
     } catch (e: unknown) {
@@ -278,9 +284,14 @@ function MarketingFulfillPageContent() {
         return;
       }
 
-      await markMarketingRequestPacked(req.id, packerName);
+      const packed = await markMarketingRequestPacked(req.id, packerName);
+      setRequests((prev) => prev.map((row) => (row.id === packed.id ? packed : row)));
       setScanOk(true);
-      setScanMessage(`Packed ${code} for ${req.recipient_name}. Print label and affix to package.`);
+      setScanMessage(
+        canBookViaBiteship(packed)
+          ? `Packed ${code} for ${req.recipient_name}. Use Book via Biteship on the card below.`
+          : `Packed ${code} for ${req.recipient_name}. Print label and affix to package.`
+      );
       playBeep(true);
       await loadQueue();
     } catch (err: unknown) {
@@ -324,6 +335,14 @@ function MarketingFulfillPageContent() {
     setSelectedIds(completedRequests.map((req) => req.id));
   };
 
+  const toggleSelectAllShipments = () => {
+    if (selectedIds.length === allRequests.length) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds(allRequests.map((req) => req.id));
+  };
+
   const toggleSelectAllActive = () => {
     if (selectedIds.length === requests.length) {
       setSelectedIds([]);
@@ -341,7 +360,12 @@ function MarketingFulfillPageContent() {
     if (!chatSession || !isAdmin(chatSession)) return;
     if (selectedIds.length === 0) return;
 
-    const pool = moduleTab === "HISTORY" ? completedRequests : requests;
+    const pool =
+      moduleTab === "HISTORY"
+        ? completedRequests
+        : moduleTab === "SHIPMENTS"
+          ? allRequests
+          : requests;
     const selected = pool.filter((req) => selectedIds.includes(req.id));
     if (selected.length === 0) return;
 
@@ -374,8 +398,23 @@ function MarketingFulfillPageContent() {
 
   const handleBatchPrintLabels = () => {
     if (selectedIds.length === 0) return;
-    const url = `/marketing/labels/batch?ids=${encodeURIComponent(selectedIds.join(","))}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(
+      marketingPackingLabelsBatchPagePath(selectedIds),
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  const handleBatchPrintBiteshipLabels = () => {
+    const pool =
+      moduleTab === "HISTORY"
+        ? completedRequests
+        : moduleTab === "SHIPMENTS"
+          ? allRequests
+          : requests;
+    const eligible = requestIdsWithBiteshipLabels(pool, selectedIds);
+    if (eligible.length === 0) return;
+    window.open(biteshipLabelsBatchPagePath(eligible), "_blank", "noopener,noreferrer");
   };
 
   const handleBatchMarkPacked = async () => {
@@ -400,7 +439,11 @@ function MarketingFulfillPageContent() {
         pendingSelected.map((req) => req.id),
         packerName
       );
-      await loadQueue();
+      setRequests((prev) => {
+        const byId = new Map(packed.map((row) => [row.id, row]));
+        return prev.map((row) => byId.get(row.id) ?? row);
+      });
+      await loadQueue(true);
       const packedIds = packed.map((req) => req.id).join(",");
       window.open(
         `/marketing/manifest/batch?ids=${encodeURIComponent(packedIds)}`,
@@ -423,9 +466,25 @@ function MarketingFulfillPageContent() {
   };
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const packedCount = requests.filter((r) => r.status === "packed").length;
+  const activeQueueRequests = useMemo(() => {
+    const statusOrder: Record<string, number> = { pending: 0, packed: 1 };
+    return [...requests].sort((a, b) => {
+      const statusDiff = (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  }, [requests]);
   const selectedPendingCount = requests.filter(
     (req) => selectedIds.includes(req.id) && req.status === "pending"
   ).length;
+  const selectionPool =
+    moduleTab === "HISTORY"
+      ? completedRequests
+      : moduleTab === "SHIPMENTS"
+        ? allRequests
+        : requests;
+  const selectedBiteshipLabelIds = requestIdsWithBiteshipLabels(selectionPool, selectedIds);
   const viewingRequest =
     allRequests.find((req) => req.id === viewingRequestId) ??
     (deepLinkedRequest?.id === viewingRequestId ? deepLinkedRequest : null);
@@ -465,6 +524,7 @@ function MarketingFulfillPageContent() {
             <MarketingNewOrdersBadge count={totalUnseen} />
             <div className="text-sm font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full">
               {pendingCount} pending
+              {packedCount > 0 ? ` · ${packedCount} packed` : ""}
             </div>
           </div>
         </div>
@@ -490,7 +550,7 @@ function MarketingFulfillPageContent() {
             )}
           >
             <span className="inline-flex items-center gap-1.5">
-              Active queue ({requests.length})
+              Active queue ({activeQueueRequests.length})
               {totalUnseen > 0 && (
                 <span className="min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center leading-none">
                   {totalUnseen > 99 ? "99+" : totalUnseen}
@@ -584,6 +644,13 @@ function MarketingFulfillPageContent() {
             onViewRequest={handleViewRequest}
             onUpdated={() => loadQueue(true)}
             live
+            selectable
+            selectedIds={selectedIds}
+            onToggleRow={toggleSelection}
+            onToggleAll={toggleSelectAllShipments}
+            allVisibleSelected={
+              allRequests.length > 0 && selectedIds.length === allRequests.length
+            }
           />
         ) : moduleTab === "HISTORY" ? (
           completedRequests.length === 0 ? (
@@ -599,8 +666,8 @@ function MarketingFulfillPageContent() {
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/80">
                 <h2 className="font-bold text-gray-900">Shipped orders</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Click a row to view order details, select rows to export audit CSV, or delete shipments as
-                  admin.
+                  Click a row to view order details, select rows to reprint labels or export audit CSV, or
+                  delete shipments as admin.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -690,21 +757,26 @@ function MarketingFulfillPageContent() {
               </div>
             </SurfaceCard>
           )
-        ) : requests.length === 0 ? (
+        ) : activeQueueRequests.length === 0 ? (
           <SurfaceCard className="p-12 text-center">
             <Package className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-600 font-medium">No pending marketing requests.</p>
+            <p className="text-gray-600 font-medium">No active marketing requests.</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Packed orders stay here until you book via Biteship and mark them shipped.
+            </p>
           </SurfaceCard>
         ) : (
           <>
             <div className="flex items-center justify-between gap-3 px-1">
               <p className="text-sm text-gray-600">
-                Select orders to batch print labels or mark pending orders packed with a manifest.
+                Pending orders need packing. Packed orders stay here for Biteship booking and shipping.
               </p>
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={requests.length > 0 && selectedIds.length === requests.length}
+                  checked={
+                    activeQueueRequests.length > 0 && selectedIds.length === activeQueueRequests.length
+                  }
                   onChange={toggleSelectAllActive}
                   className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                 />
@@ -712,7 +784,7 @@ function MarketingFulfillPageContent() {
               </label>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-            {requests.map((req) => {
+            {activeQueueRequests.map((req) => {
               const isSelected = selectedIds.includes(req.id);
               const isUnseen = (unseenByRequestId[req.id] ?? 0) > 0;
               return (
@@ -839,15 +911,15 @@ function MarketingFulfillPageContent() {
                       <Printer className="w-4 h-4" /> Print label
                     </DashButton>
                   </Link>
-                  {canPrintBiteshipLabel(req) && (
-                    <Link href={biteshipLabelPagePath(req.id)} className="flex-1 min-w-[120px]">
-                      <DashButton variant="success" size="md" className="w-full">
-                        <Truck className="w-4 h-4" /> Carrier label
-                      </DashButton>
-                    </Link>
-                  )}
                   {req.status === "packed" && (
                     <>
+                      {canPrintBiteshipLabel(req) && (
+                        <Link href={biteshipLabelPagePath(req.id)} className="flex-1 min-w-[120px]">
+                          <DashButton variant="success" size="md" className="w-full">
+                            <Printer className="w-4 h-4" /> Print carrier label
+                          </DashButton>
+                        </Link>
+                      )}
                       {chatSession &&
                         canBookViaBiteship(req) &&
                         !req.biteship_order_id && (
@@ -861,12 +933,12 @@ function MarketingFulfillPageContent() {
                           </DashButton>
                         )}
                       <DashButton
-                        variant="success"
+                        variant="subtle"
                         size="md"
                         onClick={() => handleMarkShipped(req.id)}
                         className="flex-1 min-w-[120px]"
                       >
-                        <Truck className="w-4 h-4" /> Shipped
+                        <Truck className="w-4 h-4" /> Mark shipped
                       </DashButton>
                     </>
                   )}
@@ -899,13 +971,25 @@ function MarketingFulfillPageContent() {
                   ? chatSession && isAdmin(chatSession)
                     ? selectedPendingCount > 0
                       ? `${selectedPendingCount} pending · print labels, mark packed, or delete`
-                      : "Print labels or delete selected shipments"
+                      : selectedBiteshipLabelIds.length > 0
+                        ? "Reprint packing or carrier labels, or delete selected shipments"
+                        : "Print labels or delete selected shipments"
                     : selectedPendingCount > 0
                       ? `${selectedPendingCount} pending · print labels or mark packed with manifest`
-                      : "Batch print shipping labels"
-                  : chatSession && isAdmin(chatSession)
-                    ? "Export audit CSV or delete shipments"
-                    : "Export audit CSV with pack/ship details"}
+                      : selectedBiteshipLabelIds.length > 0
+                        ? "Reprint packing or carrier labels"
+                        : "Batch print shipping labels"
+                  : moduleTab === "SHIPMENTS"
+                    ? selectedBiteshipLabelIds.length > 0
+                      ? "Reprint packing or carrier labels for selected shipments"
+                      : "Reprint packing labels for selected shipments"
+                    : chatSession && isAdmin(chatSession)
+                      ? selectedBiteshipLabelIds.length > 0
+                        ? "Reprint labels, export audit CSV, or delete shipments"
+                        : "Reprint packing labels, export audit CSV, or delete shipments"
+                      : selectedBiteshipLabelIds.length > 0
+                        ? "Reprint labels or export audit CSV"
+                        : "Reprint packing labels or export audit CSV"}
               </p>
             </div>
           </div>
@@ -916,8 +1000,13 @@ function MarketingFulfillPageContent() {
             {moduleTab === "ACTIVE" ? (
               <>
                 <DashButton variant="primary" size="md" onClick={handleBatchPrintLabels}>
-                  <Printer className="w-4 h-4" /> Print labels
+                  <Printer className="w-4 h-4" /> Packing labels
                 </DashButton>
+                {selectedBiteshipLabelIds.length > 0 && (
+                  <DashButton variant="success" size="md" onClick={handleBatchPrintBiteshipLabels}>
+                    <Truck className="w-4 h-4" /> Carrier labels
+                  </DashButton>
+                )}
                 <DashButton
                   variant="success"
                   size="md"
@@ -947,8 +1036,42 @@ function MarketingFulfillPageContent() {
                   </DashButton>
                 )}
               </>
+            ) : moduleTab === "SHIPMENTS" ? (
+              <>
+                <DashButton variant="primary" size="md" onClick={handleBatchPrintLabels}>
+                  <Printer className="w-4 h-4" /> Packing labels
+                </DashButton>
+                {selectedBiteshipLabelIds.length > 0 && (
+                  <DashButton variant="success" size="md" onClick={handleBatchPrintBiteshipLabels}>
+                    <Truck className="w-4 h-4" /> Carrier labels
+                  </DashButton>
+                )}
+                {chatSession && isAdmin(chatSession) && (
+                  <DashButton
+                    variant="danger"
+                    size="md"
+                    onClick={handleBatchDeleteSelected}
+                    disabled={batchDeleting}
+                  >
+                    {batchDeleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    Delete
+                  </DashButton>
+                )}
+              </>
             ) : (
               <>
+                <DashButton variant="primary" size="md" onClick={handleBatchPrintLabels}>
+                  <Printer className="w-4 h-4" /> Packing labels
+                </DashButton>
+                {selectedBiteshipLabelIds.length > 0 && (
+                  <DashButton variant="success" size="md" onClick={handleBatchPrintBiteshipLabels}>
+                    <Truck className="w-4 h-4" /> Carrier labels
+                  </DashButton>
+                )}
                 <DashButton variant="primary" size="md" onClick={handleExportSelected}>
                   <Download className="w-4 h-4" /> Export CSV
                 </DashButton>

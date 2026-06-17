@@ -18,6 +18,13 @@ export function biteshipCourierCodesForTier(courier: MarketingCourier): string[]
   return BITESHIP_COURIER_CODES_BY_TIER.Regular;
 }
 
+/** Comma-separated courier codes required by Biteship POST /rates/couriers. */
+export function biteshipCouriersParamForRequest(
+  courier: MarketingCourier | null | undefined
+): string {
+  return biteshipCourierCodesForTier(courier ?? "Regular").join(",");
+}
+
 export interface BiteshipRateOption {
   courier_company: string;
   courier_type: string;

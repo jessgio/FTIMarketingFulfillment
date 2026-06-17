@@ -366,7 +366,8 @@ export async function fetchMarketingRequestsByUser(email: string): Promise<Marke
   }));
 }
 
-export async function fetchPendingMarketingRequests(): Promise<MarketingRequest[]> {
+/** Pending + packed orders awaiting ship or Biteship booking. */
+export async function fetchActiveFulfillmentQueue(): Promise<MarketingRequest[]> {
   const { data, error } = await supabase
     .from("marketing_requests")
     .select("*, marketing_request_items(*)")
@@ -379,6 +380,10 @@ export async function fetchPendingMarketingRequests(): Promise<MarketingRequest[
     ...row,
     items: row.marketing_request_items ?? [],
   }));
+}
+
+export async function fetchPendingMarketingRequests(): Promise<MarketingRequest[]> {
+  return fetchActiveFulfillmentQueue();
 }
 
 export async function fetchCompletedMarketingRequests(): Promise<MarketingRequest[]> {
@@ -546,18 +551,31 @@ export async function fetchMarketingRequestByBarcode(barcode: string): Promise<M
 export async function markMarketingRequestPacked(
   id: string,
   packedBy: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<MarketingRequest> {
+  const initials = packedBy.trim().toUpperCase();
+  if (!initials) throw new Error("Enter your packer initials first.");
+
+  const { data, error } = await supabase
     .from("marketing_requests")
     .update({
       status: "packed",
-      packed_by: packedBy.trim().toUpperCase(),
+      packed_by: initials,
       packed_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("*, marketing_request_items(*)")
+    .maybeSingle();
 
   if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to mark as packed"));
+  if (!data) {
+    throw new Error("Order could not be packed. It may already be packed or shipped.");
+  }
+
+  return {
+    ...data,
+    items: data.marketing_request_items ?? [],
+  };
 }
 
 export async function markMarketingRequestsPackedBulk(

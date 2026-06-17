@@ -233,8 +233,9 @@ export function MarketingShipmentsRegistry({
                 </>
               ) : (
                 <>
-                  All ongoing and completed orders. Edit <span className="font-semibold">Purpose</span> or
-                  record <span className="font-semibold">Actual shipping label</span> for{" "}
+                  Select rows to reprint packing or carrier labels. Edit{" "}
+                  <span className="font-semibold">Purpose</span> or record{" "}
+                  <span className="font-semibold">Actual shipping label</span> for{" "}
                   {MARKETING_COURIERS_WITH_SHIPPING_LABEL.map((courier, i) => (
                     <span key={courier}>
                       {i > 0 && (i === MARKETING_COURIERS_WITH_SHIPPING_LABEL.length - 1 ? " and " : ", ")}
