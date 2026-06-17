@@ -10,6 +10,7 @@ import {
   verifyFulfillmentSession,
 } from "../../../../lib/biteshipApiAuth";
 import { filterRatesForPreferredCourier } from "../../../../lib/biteshipCouriers";
+import { parsePackageSpecInput, resolvePackageSpec } from "../../../../lib/biteshipPackageSpec";
 import { supabase } from "../../../../lib/supabaseClient";
 import type { MarketingRequest, MarketingSession } from "../../../../types/marketing";
 import { courierUsesBiteship, isIndonesiaShipment } from "../../../../types/marketing";
@@ -20,9 +21,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { session, requestId } = (await request.json()) as {
+    const { session, requestId, packageSpec: packageSpecInput } = (await request.json()) as {
       session?: MarketingSession;
       requestId?: string;
+      packageSpec?: unknown;
     };
 
     const verified = await verifyFulfillmentSession(session);
@@ -65,7 +67,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const rates = await fetchBiteshipRates(marketingRequest);
+    const parsedPackage = parsePackageSpecInput(
+      packageSpecInput,
+      marketingRequest.items?.length ?? 1
+    );
+    if ("error" in parsedPackage) {
+      return NextResponse.json({ error: parsedPackage.error }, { status: 400 });
+    }
+
+    const packageSpec = resolvePackageSpec(marketingRequest, parsedPackage.spec);
+    const rates = await fetchBiteshipRates(marketingRequest, parsedPackage.spec);
     const filtered = filterRatesForPreferredCourier(
       rates,
       marketingRequest.preferred_courier ?? "Regular"
@@ -73,6 +84,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      packageSpec,
       rates: filtered.map((rate) => ({
         courierCompany: rate.courier_company,
         courierType: rate.courier_type,

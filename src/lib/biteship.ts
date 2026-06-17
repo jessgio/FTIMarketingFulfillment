@@ -1,5 +1,18 @@
 import type { MarketingRequest } from "../types/marketing";
 import { biteshipCouriersParamForRequest } from "./biteshipCouriers";
+import {
+  buildBiteshipLineItems,
+  getDefaultPackageSpec,
+  resolvePackageSpec,
+  type BiteshipPackageSpec,
+} from "./biteshipPackageSpec";
+
+export {
+  BITESHIP_PACKAGE_DEFAULTS,
+  computeDefaultPackageSpec,
+  getDefaultPackageSpec,
+  type BiteshipPackageSpec,
+} from "./biteshipPackageSpec";
 
 const BITESHIP_API_BASE = "https://api.biteship.com/v1";
 
@@ -38,18 +51,6 @@ export function getBiteshipOriginConfig() {
     note: process.env.BITESHIP_ORIGIN_NOTE?.trim() || undefined,
     postalCode,
     organization: process.env.BITESHIP_ORIGIN_ORGANIZATION?.trim() || "From This Island",
-  };
-}
-
-export function getDefaultPackageSpec(itemCount: number) {
-  const perItemWeight = Number(process.env.BITESHIP_DEFAULT_ITEM_WEIGHT_GRAMS ?? "400");
-  const weight = Math.max(200, perItemWeight * Math.max(1, itemCount));
-  return {
-    weight,
-    length: Number(process.env.BITESHIP_DEFAULT_LENGTH_CM ?? "25"),
-    width: Number(process.env.BITESHIP_DEFAULT_WIDTH_CM ?? "20"),
-    height: Number(process.env.BITESHIP_DEFAULT_HEIGHT_CM ?? "10"),
-    value: Number(process.env.BITESHIP_DEFAULT_ITEM_VALUE ?? "150000"),
   };
 }
 
@@ -126,7 +127,10 @@ export function normalizeBiteshipRate(raw: RawBiteshipRate): BiteshipRatesPricin
   };
 }
 
-export async function fetchBiteshipRates(request: MarketingRequest): Promise<BiteshipRatesPricing[]> {
+export async function fetchBiteshipRates(
+  request: MarketingRequest,
+  packageSpecOverride?: Partial<BiteshipPackageSpec> | null
+): Promise<BiteshipRatesPricing[]> {
   const origin = getBiteshipOriginConfig();
   const destinationPostal = Number(request.postal_code?.trim());
   if (!Number.isFinite(destinationPostal)) {
@@ -140,32 +144,8 @@ export async function fetchBiteshipRates(request: MarketingRequest): Promise<Bit
     );
   }
 
-  const packageSpec = getDefaultPackageSpec(request.items?.length ?? 1);
-  const items = (request.items ?? []).map((item) => ({
-    name: item.product_name.slice(0, 255),
-    description: item.product_barcode ? `SKU ${item.product_barcode}` : undefined,
-    category: "fashion",
-    value: packageSpec.value,
-    quantity: item.qty,
-    weight: Math.max(100, Math.round(packageSpec.weight / Math.max(1, request.items?.length ?? 1))),
-    length: packageSpec.length,
-    width: packageSpec.width,
-    height: packageSpec.height,
-  }));
-
-  if (items.length === 0) {
-    items.push({
-      name: `Marketing shipment ${request.barcode}`,
-      description: undefined,
-      category: "fashion",
-      value: packageSpec.value,
-      quantity: 1,
-      weight: packageSpec.weight,
-      length: packageSpec.length,
-      width: packageSpec.width,
-      height: packageSpec.height,
-    });
-  }
+  const packageSpec = resolvePackageSpec(request, packageSpecOverride);
+  const items = buildBiteshipLineItems(request, packageSpec).map(({ sku: _sku, ...item }) => item);
 
   const body = {
     origin_postal_code: origin.postalCode,
@@ -189,6 +169,7 @@ export interface BiteshipCreateOrderInput {
   courierCompany: string;
   courierType: string;
   bookedBy: string;
+  packageSpec?: Partial<BiteshipPackageSpec> | null;
 }
 
 export interface BiteshipOrderResult {
@@ -202,7 +183,7 @@ export interface BiteshipOrderResult {
 }
 
 export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Promise<BiteshipOrderResult> {
-  const { request, courierCompany, courierType, bookedBy } = input;
+  const { request, courierCompany, courierType, bookedBy, packageSpec: packageSpecOverride } = input;
   const origin = getBiteshipOriginConfig();
   const destinationPostal = Number(request.postal_code?.trim());
   if (!Number.isFinite(destinationPostal)) {
@@ -220,34 +201,8 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
     .filter(Boolean)
     .join(", ");
 
-  const packageSpec = getDefaultPackageSpec(request.items?.length ?? 1);
-  const lineItems = (request.items ?? []).map((item) => ({
-    name: item.product_name.slice(0, 255),
-    description: item.product_barcode ? `SKU ${item.product_barcode}` : undefined,
-    category: "fashion",
-    sku: item.product_barcode ?? undefined,
-    value: packageSpec.value,
-    quantity: item.qty,
-    weight: Math.max(100, Math.round(packageSpec.weight / Math.max(1, request.items?.length ?? 1))),
-    length: packageSpec.length,
-    width: packageSpec.width,
-    height: packageSpec.height,
-  }));
-
-  if (lineItems.length === 0) {
-    lineItems.push({
-      name: `Marketing shipment ${request.barcode}`,
-      description: undefined,
-      category: "fashion",
-      sku: request.barcode,
-      value: packageSpec.value,
-      quantity: 1,
-      weight: packageSpec.weight,
-      length: packageSpec.length,
-      width: packageSpec.width,
-      height: packageSpec.height,
-    });
-  }
+  const packageSpec = resolvePackageSpec(request, packageSpecOverride);
+  const lineItems = buildBiteshipLineItems(request, packageSpec);
 
   const orderNote = [
     request.notes?.trim(),

@@ -144,6 +144,11 @@ export interface MarketingRequest {
   biteship_booked_by: string | null;
   biteship_status_updated_at: string | null;
   biteship_routing_code: string | null;
+  biteship_package_weight_grams: number | null;
+  biteship_package_length_cm: number | null;
+  biteship_package_width_cm: number | null;
+  biteship_package_height_cm: number | null;
+  biteship_package_value_idr: number | null;
   created_at: string;
   items?: MarketingRequestItem[];
 }

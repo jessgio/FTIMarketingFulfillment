@@ -9,6 +9,7 @@ import {
   unauthorizedResponse,
   verifyFulfillmentSession,
 } from "../../../../lib/biteshipApiAuth";
+import { parsePackageSpecInput } from "../../../../lib/biteshipPackageSpec";
 import { supabase } from "../../../../lib/supabaseClient";
 import type { MarketingRequest, MarketingSession } from "../../../../types/marketing";
 import { courierUsesBiteship, isIndonesiaShipment } from "../../../../types/marketing";
@@ -19,11 +20,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { session, requestId, courierCompany, courierType } = (await request.json()) as {
+    const { session, requestId, courierCompany, courierType, packageSpec: packageSpecInput } =
+      (await request.json()) as {
       session?: MarketingSession;
       requestId?: string;
       courierCompany?: string;
       courierType?: string;
+      packageSpec?: unknown;
     };
 
     const verified = await verifyFulfillmentSession(session);
@@ -89,11 +92,21 @@ export async function POST(request: Request) {
     }
 
     const bookedBy = verified.displayName || verified.email;
+
+    const parsedPackage = parsePackageSpecInput(
+      packageSpecInput,
+      marketingRequest.items?.length ?? 1
+    );
+    if ("error" in parsedPackage) {
+      return NextResponse.json({ error: parsedPackage.error }, { status: 400 });
+    }
+
     const order = await createBiteshipOrder({
       request: marketingRequest,
       courierCompany: courierCompany.trim(),
       courierType: courierType.trim(),
       bookedBy,
+      packageSpec: parsedPackage.spec,
     });
 
     const now = new Date().toISOString();
@@ -110,6 +123,11 @@ export async function POST(request: Request) {
         biteship_booked_at: now,
         biteship_booked_by: bookedBy,
         biteship_status_updated_at: now,
+        biteship_package_weight_grams: parsedPackage.spec.weight,
+        biteship_package_length_cm: parsedPackage.spec.length,
+        biteship_package_width_cm: parsedPackage.spec.width,
+        biteship_package_height_cm: parsedPackage.spec.height,
+        biteship_package_value_idr: parsedPackage.spec.value,
         ...(routingCode ? { biteship_routing_code: routingCode } : {}),
         ...(waybill
           ? {

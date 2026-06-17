@@ -1,5 +1,6 @@
 import type { MarketingRequest } from "../types/marketing";
-import { getBiteshipOriginConfig, getDefaultPackageSpec } from "./biteship";
+import { getBiteshipOriginConfig } from "./biteship";
+import { resolvePackageSpec } from "./biteshipPackageSpec";
 
 const COURIER_DISPLAY_NAMES: Record<string, string> = {
   jne: "JNE",
@@ -106,7 +107,7 @@ export function buildBiteshipLabelData(
     overrides?.courierType?.trim() || request.biteship_courier_type?.trim() || "";
 
   const origin = getBiteshipOriginConfig();
-  const packageSpec = getDefaultPackageSpec(request.items?.length ?? 1);
+  const packageSpec = resolvePackageSpec(request);
   const itemSummary = (request.items ?? [])
     .map((item) => `${item.qty}× ${item.product_name}`)
     .join(", ")
