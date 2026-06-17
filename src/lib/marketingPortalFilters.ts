@@ -139,9 +139,8 @@ export function canDeletePortalShipment(
 export function buildPortalShipmentRequests(
   allRequests: MarketingRequest[],
   ownRequests: MarketingRequest[],
-  sessionEmail: string
+  _sessionEmail: string
 ): MarketingRequest[] {
-  const normalizedEmail = sessionEmail.trim().toLowerCase();
   const byId = new Map<string, MarketingRequest>();
 
   for (const req of ownRequests) {
@@ -152,14 +151,7 @@ export function buildPortalShipmentRequests(
 
   for (const req of allRequests) {
     if (req.status === "cancelled") continue;
-    const isOwn = req.requested_by_email.trim().toLowerCase() === normalizedEmail;
-    if (isOwn) {
-      byId.set(req.id, req);
-      continue;
-    }
-    if (req.status === "pending" || req.status === "packed") {
-      byId.set(req.id, req);
-    }
+    byId.set(req.id, req);
   }
 
   return [...byId.values()].sort(

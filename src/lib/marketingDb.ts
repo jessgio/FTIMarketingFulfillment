@@ -401,10 +401,29 @@ export async function fetchCompletedMarketingRequests(): Promise<MarketingReques
   }));
 }
 
+/** Merge registry, active queue, and shipped history so packed/shipped orders stay visible. */
+export function mergeMarketingRequestsForRegistry(
+  ...pools: MarketingRequest[][]
+): MarketingRequest[] {
+  const byId = new Map<string, MarketingRequest>();
+
+  for (const pool of pools) {
+    for (const req of pool) {
+      if (req.status === "cancelled") continue;
+      byId.set(req.id, req);
+    }
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 export async function fetchAllMarketingRequestsForRegistry(): Promise<MarketingRequest[]> {
   const { data, error } = await supabase
     .from("marketing_requests")
     .select("*, marketing_request_items(*)")
+    .neq("status", "cancelled")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to load shipment registry"));
@@ -613,21 +632,35 @@ export async function markMarketingRequestsPackedBulk(
   return ids.map((id) => byId.get(id)).filter((row): row is MarketingRequest => Boolean(row));
 }
 
-export async function markMarketingRequestShipped(id: string, shippedBy: string): Promise<void> {
+export async function markMarketingRequestShipped(
+  id: string,
+  shippedBy: string
+): Promise<MarketingRequest> {
   const initials = shippedBy.trim().toUpperCase();
   if (!initials) throw new Error("Enter your initials before marking shipped.");
 
-  const { error } = await supabase
+  const shippedAt = new Date().toISOString();
+  const { data, error } = await supabase
     .from("marketing_requests")
     .update({
       status: "shipped",
-      shipped_at: new Date().toISOString(),
+      shipped_at: shippedAt,
       shipped_by: initials,
     })
     .eq("id", id)
-    .eq("status", "packed");
+    .eq("status", "packed")
+    .select("*, marketing_request_items(*)")
+    .maybeSingle();
 
   if (error) throw new Error(getSupabaseErrorMessage(error, "Failed to mark as shipped"));
+  if (!data) {
+    throw new Error("Order could not be marked shipped. It may already be shipped.");
+  }
+
+  return {
+    ...data,
+    items: data.marketing_request_items ?? [],
+  };
 }
 
 export async function searchProducts(query: string): Promise<

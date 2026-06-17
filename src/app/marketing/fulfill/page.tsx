@@ -44,6 +44,7 @@ import {
   deleteMarketingRequest,
   deleteMarketingRequestsBulk,
   fetchAllMarketingRequestsForRegistry,
+  mergeMarketingRequestsForRegistry,
   fetchCompletedMarketingRequests,
   fetchActiveFulfillmentQueue,
   fetchMarketingRequestByBarcode,
@@ -145,7 +146,7 @@ function MarketingFulfillPageContent() {
       ]);
       setRequests(activeQueue);
       setCompletedRequests(completed);
-      setAllRequests(all);
+      setAllRequests(mergeMarketingRequestsForRegistry(all, activeQueue, completed));
     } catch (e: unknown) {
       if (!silent) {
         setError(e instanceof Error ? e.message : "Failed to load queue");
@@ -286,6 +287,7 @@ function MarketingFulfillPageContent() {
 
       const packed = await markMarketingRequestPacked(req.id, packerName);
       setRequests((prev) => prev.map((row) => (row.id === packed.id ? packed : row)));
+      setAllRequests((prev) => mergeMarketingRequestsForRegistry(prev, [packed]));
       setScanOk(true);
       setScanMessage(
         canBookViaBiteship(packed)
@@ -309,13 +311,18 @@ function MarketingFulfillPageContent() {
       return;
     }
     try {
-      await markMarketingRequestShipped(id, packerName);
+      const shipped = await markMarketingRequestShipped(id, packerName);
+      setRequests((prev) => prev.filter((row) => row.id !== id));
+      setCompletedRequests((prev) =>
+        mergeMarketingRequestsForRegistry([shipped], prev)
+      );
+      setAllRequests((prev) => mergeMarketingRequestsForRegistry(prev, [shipped]));
       fetch("/api/marketing-status/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: id }),
       }).catch((err) => console.warn("Lark shipped notify failed:", err));
-      await loadQueue();
+      await loadQueue(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to update status");
     }
@@ -447,6 +454,7 @@ function MarketingFulfillPageContent() {
         const byId = new Map(packed.map((row) => [row.id, row]));
         return prev.map((row) => byId.get(row.id) ?? row);
       });
+      setAllRequests((prev) => mergeMarketingRequestsForRegistry(prev, packed));
       await loadQueue(true);
       const packedIds = packed.map((req) => req.id).join(",");
       window.open(
