@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
 import { CenteredPage, DashButton, SurfaceCard } from "../../../../../components/dashboard/primitives";
+import { ChatLoginBar } from "../../../../../components/marketing/ChatLoginBar";
 import { MarketingBiteshipShippingLabel } from "../../../../../components/marketing/MarketingBiteshipShippingLabel";
 import { getMarketingSession } from "../../../../../lib/marketingAuth";
 import type { BiteshipLabelData } from "../../../../../lib/biteshipLabelData";
@@ -20,15 +21,14 @@ function BatchBiteshipLabelsContent() {
   const idsParam = searchParams.get("ids") ?? "";
   const ids = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
 
-  const [session, setSession] = useState<MarketingSession | null>(null);
+  const [session, setSession] = useState<MarketingSession | null>(() => getMarketingSession());
   const [labels, setLabels] = useState<LoadedLabel[]>([]);
   const [skipped, setSkipped] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const stored = getMarketingSession();
+    return ids.length > 0 && Boolean(stored);
+  });
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setSession(getMarketingSession());
-  }, []);
 
   useEffect(() => {
     if (ids.length === 0) {
@@ -38,8 +38,10 @@ function BatchBiteshipLabelsContent() {
     }
 
     if (!session) {
-      setError("Sign in on the fulfillment queue to print carrier labels.");
       setLoading(false);
+      setError("");
+      setLabels([]);
+      setSkipped([]);
       return;
     }
 
@@ -97,6 +99,24 @@ function BatchBiteshipLabelsContent() {
       cancelled = true;
     };
   }, [idsParam, session]);
+
+  if (!session) {
+    return (
+      <CenteredPage>
+        <SurfaceCard className="p-8 max-w-lg w-full">
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Carrier label sign-in</h1>
+          <p className="text-sm text-gray-600 mb-4">
+            Packer initials are not the same as account sign-in. Use your fulfillment email and PIN
+            to print carrier labels.
+          </p>
+          <ChatLoginBar session={session} onSessionChange={setSession} />
+          <Link href="/marketing/fulfill" className="inline-block mt-4">
+            <DashButton variant="ghost" size="md">Back to queue</DashButton>
+          </Link>
+        </SurfaceCard>
+      </CenteredPage>
+    );
+  }
 
   if (loading) {
     return (

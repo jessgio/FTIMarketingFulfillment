@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
 import { CenteredPage, DashButton, SurfaceCard } from "../../../../../components/dashboard/primitives";
+import { ChatLoginBar } from "../../../../../components/marketing/ChatLoginBar";
 import { MarketingBiteshipShippingLabel } from "../../../../../components/marketing/MarketingBiteshipShippingLabel";
 import { getMarketingSession } from "../../../../../lib/marketingAuth";
 import type { BiteshipLabelData } from "../../../../../lib/biteshipLabelData";
@@ -11,20 +12,17 @@ import type { MarketingSession } from "../../../../../types/marketing";
 
 export default function MarketingBiteshipLabelPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
-  const [session, setSession] = useState<MarketingSession | null>(null);
+  const [session, setSession] = useState<MarketingSession | null>(() => getMarketingSession());
   const [label, setLabel] = useState<BiteshipLabelData | null>(null);
   const [referenceBarcode, setReferenceBarcode] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(getMarketingSession()));
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setSession(getMarketingSession());
-  }, []);
 
   useEffect(() => {
     if (!session) {
       setLoading(false);
-      setError("Sign in on the fulfillment queue to print carrier labels.");
+      setError("");
+      setLabel(null);
       return;
     }
 
@@ -67,6 +65,24 @@ export default function MarketingBiteshipLabelPage(props: { params: Promise<{ id
       cancelled = true;
     };
   }, [id, session]);
+
+  if (!session) {
+    return (
+      <CenteredPage>
+        <SurfaceCard className="p-8 max-w-lg w-full">
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Carrier label sign-in</h1>
+          <p className="text-sm text-gray-600 mb-4">
+            Packer initials are not the same as account sign-in. Use your fulfillment email and PIN
+            to print carrier labels.
+          </p>
+          <ChatLoginBar session={session} onSessionChange={setSession} />
+          <Link href="/marketing/fulfill" className="inline-block mt-4">
+            <DashButton variant="ghost" size="md">Back to queue</DashButton>
+          </Link>
+        </SurfaceCard>
+      </CenteredPage>
+    );
+  }
 
   if (loading) {
     return (

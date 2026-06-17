@@ -58,7 +58,7 @@ export function ChatLoginBar({
 
   return (
     <SurfaceCard className="p-4 mb-6">
-      <p className="text-xs font-bold uppercase text-gray-700 mb-2">Sign in for chat &amp; registry edits</p>
+      <p className="text-xs font-bold uppercase text-gray-700 mb-2">Sign in for chat, registry edits &amp; carrier labels</p>
       <p className="text-xs text-gray-600 mb-3">
         Fulfillment and admin accounts use fulfillment@fromthisisland.com · Requesters use your team email.
       </p>

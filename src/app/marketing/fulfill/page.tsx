@@ -406,6 +406,10 @@ function MarketingFulfillPageContent() {
   };
 
   const handleBatchPrintBiteshipLabels = () => {
+    if (!chatSession) {
+      setError("Sign in with your fulfillment email and PIN above to print carrier labels.");
+      return;
+    }
     const pool =
       moduleTab === "HISTORY"
         ? completedRequests
@@ -913,13 +917,27 @@ function MarketingFulfillPageContent() {
                   </Link>
                   {req.status === "packed" && (
                     <>
-                      {canPrintBiteshipLabel(req) && (
+                      {canPrintBiteshipLabel(req) &&
+                        (chatSession ? (
                         <Link href={biteshipLabelPagePath(req.id)} className="flex-1 min-w-[120px]">
                           <DashButton variant="success" size="md" className="w-full">
                             <Printer className="w-4 h-4" /> Print carrier label
                           </DashButton>
                         </Link>
-                      )}
+                        ) : (
+                          <DashButton
+                            variant="success"
+                            size="md"
+                            className="flex-1 min-w-[120px]"
+                            onClick={() =>
+                              setError(
+                                "Sign in with your fulfillment email and PIN above to print carrier labels."
+                              )
+                            }
+                          >
+                            <Printer className="w-4 h-4" /> Print carrier label
+                          </DashButton>
+                        ))}
                       {chatSession &&
                         canBookViaBiteship(req) &&
                         !req.biteship_order_id && (
