@@ -145,7 +145,9 @@ export function MarketingBiteshipBookingModal({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40"
-      onClick={onClose}
+      onClick={() => {
+        if (!booked) onClose();
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="biteship-booking-title"
@@ -191,7 +193,7 @@ export function MarketingBiteshipBookingModal({
                   <Printer className="w-4 h-4" /> Print carrier label
                 </DashButton>
                 <DashButton variant="ghost" size="md" className="w-full" onClick={onClose}>
-                  Done — back to queue
+                  Done — mark shipped when ready
                 </DashButton>
               </div>
             </>

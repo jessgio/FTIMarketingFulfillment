@@ -666,8 +666,8 @@ function MarketingFulfillPageContent() {
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/80">
                 <h2 className="font-bold text-gray-900">Shipped orders</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Click a row to view order details, select rows to reprint labels or export audit CSV, or
-                  delete shipments as admin.
+                  Click a row to view order details, select rows to reprint packing or carrier labels or export
+                  audit CSV, or delete shipments as admin.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -1111,7 +1111,6 @@ function MarketingFulfillPageContent() {
           session={chatSession}
           onClose={() => setBiteshipBookingRequest(null)}
           onBooked={() => {
-            setBiteshipBookingRequest(null);
             void loadQueue(true);
           }}
         />

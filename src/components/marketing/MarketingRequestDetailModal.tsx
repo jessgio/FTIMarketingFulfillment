@@ -290,7 +290,6 @@ export function MarketingRequestDetailModal({
           session={session}
           onClose={() => setShowBiteshipBooking(false)}
           onBooked={() => {
-            setShowBiteshipBooking(false);
             onUpdated?.();
           }}
         />
