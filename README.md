@@ -55,7 +55,7 @@ Warehouse staff can book **Instant**, **Same Day**, **Regular**, and **Kargo** s
 ### Setup
 
 1. Run migration `20260615120000_012_biteship_integration.sql` in Supabase.
-2. Add Biteship env vars from `.env.example` (API key + warehouse origin address).
+2. Add Biteship env vars from `.env.example` (API key + warehouse origin address). For **Instant** and **Same Day** couriers, also set `BITESHIP_ORIGIN_LATITUDE` and `BITESHIP_ORIGIN_LONGITUDE` (warehouse coordinates from Google Maps). Grab/Gojek require coordinates — postal codes alone are not enough.
 3. In [Biteship Integrations → Webhook](https://dashboard.biteship.com/integrations), add:
    - **URL:** `https://<your-domain>/api/biteship/webhook`
    - **Events:** `order.status`, `order.waybill_id`

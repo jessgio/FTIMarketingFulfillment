@@ -25,6 +25,11 @@ export function biteshipCouriersParamForRequest(
   return biteshipCourierCodesForTier(courier ?? "Regular").join(",");
 }
 
+/** Grab, Gojek, Borzo, and Lalamove require coordinates for rates and booking. */
+export function courierRequiresCoordinates(courier: MarketingCourier | null | undefined): boolean {
+  return courier === "Instant" || courier === "Same Day";
+}
+
 export interface BiteshipRateOption {
   courier_company: string;
   courier_type: string;

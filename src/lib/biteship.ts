@@ -1,5 +1,10 @@
 import type { MarketingRequest } from "../types/marketing";
-import { biteshipCouriersParamForRequest } from "./biteshipCouriers";
+import { biteshipCouriersParamForRequest, courierRequiresCoordinates } from "./biteshipCouriers";
+import {
+  buildMarketingDestinationAddress,
+  geocodeMarketingRequestDestination,
+  type GeoCoordinate,
+} from "./biteshipGeocode";
 import {
   buildBiteshipLineItems,
   getDefaultPackageSpec,
@@ -43,6 +48,13 @@ export function getBiteshipOriginConfig() {
     );
   }
 
+  const latitude = Number(process.env.BITESHIP_ORIGIN_LATITUDE?.trim());
+  const longitude = Number(process.env.BITESHIP_ORIGIN_LONGITUDE?.trim());
+  const coordinate =
+    Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? { latitude, longitude }
+      : undefined;
+
   return {
     contactName,
     contactPhone,
@@ -50,8 +62,20 @@ export function getBiteshipOriginConfig() {
     address,
     note: process.env.BITESHIP_ORIGIN_NOTE?.trim() || undefined,
     postalCode,
+    coordinate,
     organization: process.env.BITESHIP_ORIGIN_ORGANIZATION?.trim() || "From This Island",
   };
+}
+
+export function getBiteshipOriginCoordinates(): GeoCoordinate {
+  const latitude = Number(process.env.BITESHIP_ORIGIN_LATITUDE?.trim());
+  const longitude = Number(process.env.BITESHIP_ORIGIN_LONGITUDE?.trim());
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new BiteshipApiError(
+      "Instant delivery requires warehouse coordinates. Set BITESHIP_ORIGIN_LATITUDE and BITESHIP_ORIGIN_LONGITUDE."
+    );
+  }
+  return { latitude, longitude };
 }
 
 async function biteshipFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -147,12 +171,27 @@ export async function fetchBiteshipRates(
   const packageSpec = resolvePackageSpec(request, packageSpecOverride);
   const items = buildBiteshipLineItems(request, packageSpec).map(({ sku: _sku, ...item }) => item);
 
-  const body = {
-    origin_postal_code: origin.postalCode,
-    destination_postal_code: destinationPostal,
-    couriers,
-    items,
-  };
+  const needsCoordinates = courierRequiresCoordinates(request.preferred_courier);
+  let body: Record<string, unknown>;
+  if (needsCoordinates) {
+    const originCoordinate = getBiteshipOriginCoordinates();
+    const destinationCoordinate = await geocodeMarketingRequestDestination(request);
+    body = {
+      origin_latitude: originCoordinate.latitude,
+      origin_longitude: originCoordinate.longitude,
+      destination_latitude: destinationCoordinate.latitude,
+      destination_longitude: destinationCoordinate.longitude,
+      couriers,
+      items,
+    };
+  } else {
+    body = {
+      origin_postal_code: origin.postalCode,
+      destination_postal_code: destinationPostal,
+      couriers,
+      items,
+    };
+  }
 
   const result = await biteshipFetch<{
     pricing?: RawBiteshipRate[];
@@ -193,13 +232,7 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
     throw new BiteshipApiError("Recipient phone is required for Biteship booking.");
   }
 
-  const destinationAddress = [
-    request.address_line1,
-    request.address_line2,
-    `${request.city}, ${request.state}`,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const destinationAddress = buildMarketingDestinationAddress(request);
 
   const packageSpec = resolvePackageSpec(request, packageSpecOverride);
   const lineItems = buildBiteshipLineItems(request, packageSpec);
@@ -213,6 +246,12 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
     .filter(Boolean)
     .join(" · ");
 
+  const needsCoordinates = courierRequiresCoordinates(request.preferred_courier);
+  const originCoordinate = needsCoordinates ? getBiteshipOriginCoordinates() : null;
+  const destinationCoordinate = needsCoordinates
+    ? await geocodeMarketingRequestDestination(request)
+    : null;
+
   const body = {
     shipper_contact_name: origin.contactName,
     shipper_contact_phone: origin.contactPhone,
@@ -223,12 +262,16 @@ export async function createBiteshipOrder(input: BiteshipCreateOrderInput): Prom
     origin_contact_email: origin.contactEmail,
     origin_address: origin.address,
     origin_note: origin.note,
-    origin_postal_code: origin.postalCode,
+    ...(needsCoordinates && originCoordinate
+      ? { origin_coordinate: originCoordinate }
+      : { origin_postal_code: origin.postalCode }),
     destination_contact_name: request.recipient_name,
     destination_contact_phone: request.recipient_phone.trim(),
     destination_address: destinationAddress,
     destination_note: request.notes?.trim() || undefined,
-    destination_postal_code: destinationPostal,
+    ...(needsCoordinates && destinationCoordinate
+      ? { destination_coordinate: destinationCoordinate }
+      : { destination_postal_code: destinationPostal }),
     courier_company: courierCompany,
     courier_type: courierType,
     delivery_type: "now",
