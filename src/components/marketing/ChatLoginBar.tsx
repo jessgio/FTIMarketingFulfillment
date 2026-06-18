@@ -7,6 +7,7 @@ import { clearMarketingSession, setMarketingSession } from "../../lib/marketingA
 import { loginMarketingUser } from "../../lib/marketingDb";
 import { roleLabel } from "../../lib/marketingRoles";
 import type { MarketingSession } from "../../types/marketing";
+import { ForgotPinLink } from "./ForgotPinLink";
 
 export function ChatLoginBar({
   session,
@@ -88,6 +89,7 @@ export function ChatLoginBar({
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
         </DashButton>
       </form>
+      <ForgotPinLink email={email} className="mt-2" />
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
     </SurfaceCard>
   );

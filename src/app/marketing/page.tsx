@@ -57,6 +57,7 @@ import { MarketingSummaryPanel } from "../../components/marketing/MarketingSumma
 import { MarketingAddressFields } from "../../components/marketing/MarketingAddressFields";
 import { MarketingPurposeSummary } from "../../components/marketing/MarketingPurposeSummary";
 import { MarketingSavedPurposesField } from "../../components/marketing/MarketingSavedPurposesField";
+import { ForgotPinLink } from "../../components/marketing/ForgotPinLink";
 import { RequestChat } from "../../components/marketing/RequestChat";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { useMarketingChatUnread } from "../../hooks/useMarketingChatUnread";
@@ -611,6 +612,7 @@ function MarketingPageContent() {
                 className={fieldInput}
                 placeholder="••••"
               />
+              <ForgotPinLink email={email} className="mt-2" />
             </div>
             {loginError && <p className="text-sm text-red-600 font-medium">{loginError}</p>}
             <DashButton type="submit" variant="pink" size="lg" className="w-full" disabled={loggingIn}>
