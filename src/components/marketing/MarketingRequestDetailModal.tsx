@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Loader2, Printer, Trash2, Truck, X, ExternalLink } from "lucide-react";
-import { DashButton, cx } from "../dashboard/primitives";
+import { DashButton, cx, dismissOnBackdropPointerDown } from "../dashboard/primitives";
 import { RequestChat } from "./RequestChat";
 import {
   BiteshipStatusBadge,
@@ -76,7 +76,7 @@ export function MarketingRequestDetailModal({
     <>
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40"
-      onClick={onClose}
+      onMouseDown={dismissOnBackdropPointerDown(onClose)}
       role="dialog"
       aria-modal="true"
       aria-labelledby="marketing-request-detail-title"

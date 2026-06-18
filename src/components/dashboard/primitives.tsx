@@ -1,7 +1,16 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, MouseEventHandler, ReactNode } from "react";
 
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+/** Dismiss overlays only on direct backdrop presses — not when a text-selection drag ends outside the panel. */
+export function dismissOnBackdropPointerDown(
+  onDismiss: () => void
+): MouseEventHandler<HTMLDivElement> {
+  return (event) => {
+    if (event.target === event.currentTarget) onDismiss();
+  };
 }
 
 /** Readable form fields on light surfaces (warehouse dashboards stay light-themed). */

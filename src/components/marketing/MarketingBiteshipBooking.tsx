@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Printer, RefreshCw, Truck, X } from "lucide-react";
-import { DashButton, cx, fieldInput } from "../dashboard/primitives";
+import { DashButton, cx, dismissOnBackdropPointerDown, fieldInput } from "../dashboard/primitives";
 import { formatBiteshipStatus } from "../../lib/biteshipCouriers";
 import { biteshipLabelPagePath } from "../../lib/biteshipLabelData";
 import {
@@ -209,9 +209,9 @@ export function MarketingBiteshipBookingModal({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40"
-      onClick={() => {
+      onMouseDown={dismissOnBackdropPointerDown(() => {
         if (!booked) onClose();
-      }}
+      })}
       role="dialog"
       aria-modal="true"
       aria-labelledby="biteship-booking-title"
