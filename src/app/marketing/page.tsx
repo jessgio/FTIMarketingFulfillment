@@ -37,6 +37,7 @@ import {
   fetchMarketingRequestPurposes,
   fetchMarketingRequestsByUser,
   fetchAllMarketingRequestsForRegistry,
+  findCatalogSkuErrors,
   loginMarketingUser,
   refreshMarketingSession,
   searchProducts,
@@ -66,6 +67,7 @@ import {
   useMarketingRequestDeepLink,
 } from "../../hooks/useMarketingRequestDeepLink";
 import type { RequestDeepLinkIntent } from "../../lib/marketingDeepLinks";
+import type { CatalogProduct } from "../../lib/productSku";
 import { buildPortalShipmentRequests } from "../../lib/marketingPortalFilters";
 import {
   canAccessRequestPortal,
@@ -80,7 +82,11 @@ import {
   type MarketingSession,
 } from "../../types/marketing";
 
-type DraftItem = { product_barcode: string; product_name: string; qty: number };
+type DraftItem = { product_barcode: string; sku: string; product_name: string; qty: number };
+
+function emptyDraftItem(): DraftItem {
+  return { product_barcode: "", sku: "", product_name: "", qty: 1 };
+}
 
 const statusStyles: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -154,10 +160,10 @@ function MarketingPageContent() {
   const [requestPurpose, setRequestPurpose] = useState("");
   const [savedPurposes, setSavedPurposes] = useState<string[]>([]);
   const [deletingPurpose, setDeletingPurpose] = useState<string | null>(null);
-  const [items, setItems] = useState<DraftItem[]>([{ product_barcode: "", product_name: "", qty: 1 }]);
+  const [items, setItems] = useState<DraftItem[]>([emptyDraftItem()]);
 
   const [activeLookupIndex, setActiveLookupIndex] = useState<number | null>(null);
-  const [productHits, setProductHits] = useState<{ barcode: string; clean_name: string }[]>([]);
+  const [productHits, setProductHits] = useState<CatalogProduct[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
@@ -305,7 +311,7 @@ function MarketingPageContent() {
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { product_barcode: "", product_name: "", qty: 1 }]);
+    setItems((prev) => [...prev, emptyDraftItem()]);
   };
 
   const removeItem = (index: number) => {
@@ -324,14 +330,18 @@ function MarketingPageContent() {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   };
 
-  const pickProduct = (index: number, product: { barcode: string; clean_name: string }) => {
-    updateItem(index, { product_barcode: product.barcode, product_name: product.clean_name });
+  const pickProduct = (index: number, product: CatalogProduct) => {
+    updateItem(index, {
+      product_barcode: product.barcode,
+      sku: product.sku,
+      product_name: product.clean_name,
+    });
     setProductHits([]);
     setActiveLookupIndex(null);
   };
 
   const handleProductNameChange = (index: number, value: string) => {
-    updateItem(index, { product_name: value });
+    updateItem(index, { product_name: value, sku: "", product_barcode: "" });
     setActiveLookupIndex(index);
   };
 
@@ -349,7 +359,7 @@ function MarketingPageContent() {
     setCountry("Indonesia");
     setNotes("");
     setRequestPurpose("");
-    setItems([{ product_barcode: "", product_name: "", qty: 1 }]);
+    setItems([emptyDraftItem()]);
     setActiveLookupIndex(null);
     setProductHits([]);
   };
@@ -375,11 +385,12 @@ function MarketingPageContent() {
     setItems(
       (req.items ?? []).length > 0
         ? (req.items ?? []).map((item) => ({
-            product_barcode: item.product_barcode ?? "",
+            product_barcode: item.sku ? (item.product_barcode ?? "") : "",
+            sku: item.sku ?? "",
             product_name: item.product_name,
             qty: item.qty,
           }))
-        : [{ product_barcode: "", product_name: "", qty: 1 }]
+        : [emptyDraftItem()]
     );
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -449,6 +460,12 @@ function MarketingPageContent() {
 
       if (result.errors.length > 0) {
         setImportErrors(result.errors);
+        return;
+      }
+
+      const skuErrors = await findCatalogSkuErrors(result.packages.flatMap((pkg) => pkg.items));
+      if (skuErrors.length > 0) {
+        setImportErrors(skuErrors);
         return;
       }
 
@@ -802,7 +819,9 @@ function MarketingPageContent() {
               Upload a CSV with one row per item. Rows sharing the same{" "}
               <span className="font-mono font-semibold">package_id</span> become one shipment with multiple
               products. Use <span className="font-mono font-semibold">request_purpose</span> for internal
-              event/campaign tracking (not printed on labels).
+              event/campaign tracking (not printed on labels). An <span className="font-mono font-semibold">sku</span> or{" "}
+              <span className="font-mono font-semibold">product_barcode</span> must already exist in the product
+              catalog. Leave both blank to submit a product name with no SKU.
             </p>
 
             <div className="flex flex-wrap gap-2 mb-6">
@@ -995,28 +1014,51 @@ function MarketingPageContent() {
             </section>
 
             <section>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-1">
                 <h3 className="text-xs font-bold uppercase text-gray-700">Items to pack</h3>
                 <DashButton type="button" variant="subtle" size="sm" onClick={addItem}>
                   <Plus className="w-4 h-4" /> Add item
                 </DashButton>
               </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Search by product name. A catalog match saves the SKU for export and does not show it here.
+              </p>
 
               <div className="space-y-3">
                 {items.map((item, index) => (
                   <div key={index} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2">
                       <div className="flex-1 relative min-w-0">
                         <input
                           value={item.product_name}
                           onChange={(e) => handleProductNameChange(index, e.target.value)}
                           onFocus={() => setActiveLookupIndex(index)}
                           onBlur={() => {
+                            const query = item.product_name.trim().toLowerCase();
+                            const hit = productHits.find(
+                              (product) =>
+                                product.sku.toLowerCase() === query || product.barcode.toLowerCase() === query
+                            );
                             window.setTimeout(() => {
+                              if (hit) {
+                                setItems((current) =>
+                                  current.map((row, rowIndex) =>
+                                    rowIndex === index && !row.sku
+                                      ? {
+                                          ...row,
+                                          product_name: hit.clean_name,
+                                          sku: hit.sku,
+                                          product_barcode: hit.barcode,
+                                        }
+                                      : row
+                                  )
+                                );
+                              }
                               setActiveLookupIndex((current) => (current === index ? null : current));
                             }, 150);
                           }}
-                          placeholder="Product name — type to search SKU or enter freely"
+                          placeholder="Product name"
+                          aria-label="Product name"
                           required
                           autoComplete="off"
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:ring-2 focus:ring-violet-400 focus:border-violet-400 outline-none"
@@ -1032,7 +1074,6 @@ function MarketingPageContent() {
                                   className="w-full text-left px-3 py-2 text-sm hover:bg-violet-50"
                                 >
                                   <span className="font-medium">{hit.clean_name}</span>
-                                  <span className="text-gray-600 ml-2 font-mono text-xs">{hit.barcode}</span>
                                 </button>
                               </li>
                             ))}
@@ -1052,12 +1093,6 @@ function MarketingPageContent() {
                         </DashButton>
                       )}
                     </div>
-                    <input
-                      value={item.product_barcode}
-                      onChange={(e) => updateItem(index, { product_barcode: e.target.value })}
-                      placeholder="Barcode / SKU (optional — filled when you pick from search)"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white text-gray-800"
-                    />
                   </div>
                 ))}
               </div>

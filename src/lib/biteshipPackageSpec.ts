@@ -140,18 +140,21 @@ export function buildBiteshipLineItems(
   const itemCount = Math.max(1, request.items?.length ?? 1);
   const perLineWeight = Math.max(100, Math.round(packageSpec.weight / itemCount));
 
-  const lineItems = (request.items ?? []).map((item) => ({
-    name: item.product_name.slice(0, 255),
-    description: item.product_barcode ? `SKU ${item.product_barcode}` : undefined,
-    category: "fashion" as const,
-    sku: item.product_barcode ?? undefined,
-    value: packageSpec.value,
-    quantity: item.qty,
-    weight: perLineWeight,
-    length: packageSpec.length,
-    width: packageSpec.width,
-    height: packageSpec.height,
-  }));
+  const lineItems = (request.items ?? []).map((item) => {
+    const sku = item.sku || item.product_barcode || undefined;
+    return {
+      name: item.product_name.slice(0, 255),
+      description: sku ? `SKU ${sku}` : undefined,
+      category: "fashion" as const,
+      sku,
+      value: packageSpec.value,
+      quantity: item.qty,
+      weight: perLineWeight,
+      length: packageSpec.length,
+      width: packageSpec.width,
+      height: packageSpec.height,
+    };
+  });
 
   if (lineItems.length === 0) {
     lineItems.push({

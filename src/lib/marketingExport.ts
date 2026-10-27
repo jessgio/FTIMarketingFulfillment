@@ -31,6 +31,7 @@ const EXPORT_HEADERS = [
   "biteship_booked_at",
   "biteship_booked_by",
   "product_name",
+  "sku",
   "product_barcode",
   "qty",
   "request_purpose",
@@ -56,7 +57,9 @@ export function buildMarketingHistoryExportCsv(requests: MarketingRequest[]): st
   const rows: string[] = [EXPORT_HEADERS.join(",")];
 
   for (const req of requests) {
-    const items = req.items?.length ? req.items : [{ product_name: "", product_barcode: null, qty: 0 }];
+    const items = req.items?.length
+      ? req.items
+      : [{ product_name: "", product_barcode: null, sku: null, qty: 0 }];
     for (const item of items) {
       const line = [
         req.barcode,
@@ -89,6 +92,7 @@ export function buildMarketingHistoryExportCsv(requests: MarketingRequest[]): st
         formatTimestamp(req.biteship_booked_at),
         req.biteship_booked_by ?? "",
         item.product_name,
+        item.sku ?? "",
         item.product_barcode ?? "",
         String(item.qty),
         req.request_purpose ?? "",

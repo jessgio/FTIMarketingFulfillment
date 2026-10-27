@@ -19,6 +19,7 @@ export const MARKETING_IMPORT_HEADERS = [
   "notes",
   "request_purpose",
   "product_name",
+  "sku",
   "product_barcode",
   "qty",
 ] as const;
@@ -39,6 +40,7 @@ export const MARKETING_IMPORT_TEMPLATE_ROWS: string[][] = [
     "Gift wrap — fragile items",
     "TikTok creator seeding — Q2 launch",
     "Lip Gloss Rose",
+    "LIP-ROSE",
     "8801234567890",
     "2",
   ],
@@ -57,6 +59,7 @@ export const MARKETING_IMPORT_TEMPLATE_ROWS: string[][] = [
     "Gift wrap — fragile items",
     "TikTok creator seeding — Q2 launch",
     "Face Serum 30ml",
+    "SERUM-30",
     "8801234567891",
     "1",
   ],
@@ -75,6 +78,7 @@ export const MARKETING_IMPORT_TEMPLATE_ROWS: string[][] = [
     "",
     "Retail pop-up restock",
     "Body Lotion",
+    "",
     "",
     "1",
   ],
@@ -102,7 +106,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
     "campaign",
   ],
   product_name: ["product_name", "productname", "product", "item", "item_name"],
-  product_barcode: ["product_barcode", "productbarcode", "barcode", "sku", "upc"],
+  sku: ["sku", "product_sku", "item_sku"],
+  product_barcode: ["product_barcode", "productbarcode", "barcode", "upc"],
   qty: ["qty", "quantity", "amount", "units"],
 };
 
@@ -373,9 +378,11 @@ export function parseMarketingImportCsv(text: string): MarketingImportParseResul
     }
 
     const pkg = byPackageId.get(packageId)!;
+    const sku = cell("sku");
     const barcode = cell("product_barcode");
     pkg.items.push({
       product_name: productName,
+      sku: sku || undefined,
       product_barcode: barcode || undefined,
       qty,
     });

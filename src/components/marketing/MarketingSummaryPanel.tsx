@@ -134,7 +134,7 @@ export function MarketingSummaryPanel({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1280px]">
+            <table className="w-full text-sm min-w-[1160px]">
               <thead className="bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wide text-gray-600">
                 <tr>
                   <th className="px-3 py-3">Status</th>
@@ -148,7 +148,6 @@ export function MarketingSummaryPanel({
                   <th className="px-3 py-3 min-w-[160px]">Delivery status</th>
                   <th className="px-3 py-3">Due</th>
                   <th className="px-3 py-3 min-w-[180px]">Product</th>
-                  <th className="px-3 py-3">SKU</th>
                   <th className="px-3 py-3 text-right">Qty</th>
                   <th className="px-3 py-3 w-8" aria-hidden="true" />
                 </tr>
@@ -220,9 +219,6 @@ export function MarketingSummaryPanel({
                           </>
                         )}
                         <td className="px-3 py-3 font-medium text-gray-900">{item.product_name}</td>
-                        <td className="px-3 py-3 font-mono text-xs text-gray-700">
-                          {item.product_barcode || "—"}
-                        </td>
                         <td className="px-3 py-3 text-right font-bold tabular-nums text-gray-900">{item.qty}</td>
                         {isFirstItem && (
                           <td className="px-3 py-3 align-top" rowSpan={rowSpan}>

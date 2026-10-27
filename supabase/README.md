@@ -15,6 +15,10 @@ Run migrations in order against a **new** Supabase project (separate from Aeris 
 9. `009_marketing_admin_request_views.sql` — new-order badges for admins
 10. `010_user_divisions_and_roles.sql` — divisions + requester/fulfillment/admin roles
 11. `011_add_courier_options.sql` — Rayspeed, UPS, DHL, FedEx courier options
+12. `012_biteship_integration.sql` — Biteship booking fields
+13. `013_biteship_routing_code.sql` — Biteship routing code
+14. `014_biteship_package_spec.sql` — package dimensions for Biteship
+15. `015_product_sku.sql` — catalog SKU, request-line SKU, and foreign key
 
 Apply via Supabase SQL Editor (paste each file in order) or `supabase db push` if linked locally.
 
@@ -54,10 +58,14 @@ on conflict (email) do update set
 
 ## Products
 
-Load your FTI product catalog into `products` (`barcode`, `clean_name`). Request forms use this for autocomplete.
+Load your FTI product catalog into `products` (`barcode`, `sku`, `clean_name`). Request forms search this catalog and show **clean_name** only. The SKU is stored on the shipment line and included in CSV exports. If you omit `sku`, it is set to the barcode.
+
+An SKU or barcode on a request must already exist in `products`. A line can still use a free-text product name when both are left blank.
 
 ```sql
-insert into products (barcode, clean_name) values
-  ('1234567890123', 'Example Product Name')
-on conflict (barcode) do update set clean_name = excluded.clean_name;
+insert into products (barcode, sku, clean_name) values
+  ('1234567890123', 'EXAMPLE-SKU', 'Example Product Name')
+on conflict (barcode) do update set
+  sku = excluded.sku,
+  clean_name = excluded.clean_name;
 ```
