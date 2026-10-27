@@ -8,6 +8,8 @@ import {
   catalogCodeResolved,
   catalogNameResolved,
   collectCatalogSkuErrors,
+  fillMissingSkuFromCatalog,
+  normalizeCatalogName,
   resolveRequestLine,
   type CatalogProduct,
   type RequestLineInput,
@@ -44,6 +46,14 @@ function rememberProducts(found: Map<string, CatalogProduct>, rows: CatalogProdu
 
 function ilikeExact(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+function ilikeNamePattern(name: string): string {
+  return normalizeCatalogName(name)
+    .split(" ")
+    .map((part) => ilikeExact(part))
+    .filter(Boolean)
+    .join("%");
 }
 
 async function selectProducts(
@@ -111,7 +121,7 @@ async function loadCatalogProducts(items: RequestLineInput[]): Promise<CatalogPr
         const { data, error } = await supabase
           .from("products")
           .select(PRODUCT_COLUMNS)
-          .ilike("clean_name", ilikeExact(name))
+          .ilike("clean_name", ilikeNamePattern(name))
           .limit(5);
         if (error) throw new Error(getSupabaseErrorMessage(error, "Product lookup failed"));
         return data ?? [];
@@ -131,6 +141,25 @@ async function resolveRequestLineItems(items: RequestLineInput[]): Promise<Resol
 export async function findCatalogSkuErrors(items: RequestLineInput[]): Promise<string[]> {
   const products = await loadCatalogProducts(items);
   return collectCatalogSkuErrors(products, items);
+}
+
+/** Copy catalog SKUs onto name-only lines that were saved before a product existed. */
+export async function attachCatalogSkus(requests: MarketingRequest[]): Promise<MarketingRequest[]> {
+  const pendingNames = requests.flatMap((request) =>
+    (request.items ?? [])
+      .filter((item) => !item.sku?.trim() && item.product_name.trim())
+      .map((item) => item.product_name)
+  );
+  if (pendingNames.length === 0) return requests;
+
+  const products = await loadCatalogProducts(
+    pendingNames.map((product_name) => ({ product_name, qty: 1 }))
+  );
+
+  return requests.map((request) => ({
+    ...request,
+    items: (request.items ?? []).map((item) => fillMissingSkuFromCatalog(item, products)),
+  }));
 }
 
 function throwItemSaveError(error: unknown, fallback: string): never {

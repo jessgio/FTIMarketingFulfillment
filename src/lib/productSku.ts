@@ -47,17 +47,26 @@ function findByCode(products: CatalogProduct[], code: string): CatalogProduct | 
   return undefined;
 }
 
-function findByName(products: CatalogProduct[], name: string): CatalogProduct | "ambiguous" | undefined {
-  const exact = uniqueProducts(products.filter((product) => product.clean_name === name));
-  if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return "ambiguous";
+/** Case, spacing, and dash differences do not make two names different. */
+export function normalizeCatalogName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  const lower = name.toLowerCase();
-  const loose = uniqueProducts(
-    products.filter((product) => product.clean_name.toLowerCase() === lower)
+function findByName(products: CatalogProduct[], name: string): CatalogProduct | "ambiguous" | undefined {
+  const key = normalizeCatalogName(name);
+  if (!key) return undefined;
+
+  const matches = uniqueProducts(
+    products.filter((product) => normalizeCatalogName(product.clean_name) === key)
   );
-  if (loose.length === 1) return loose[0];
-  if (loose.length > 1) return "ambiguous";
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) return "ambiguous";
   return undefined;
 }
 
@@ -161,6 +170,25 @@ export function resolveRequestLine(products: CatalogProduct[], item: RequestLine
     product_barcode: null,
     sku: null,
     qty: item.qty,
+  };
+}
+
+/**
+ * Older shipment lines stored only the typed product name. Fill the catalog SKU
+ * when that name matches one product, without changing the name shown on the row.
+ */
+export function fillMissingSkuFromCatalog<
+  T extends { product_name: string; product_barcode?: string | null; sku?: string | null },
+>(item: T, products: CatalogProduct[]): T {
+  if (item.sku?.trim()) return item;
+
+  const match = findByName(products, item.product_name);
+  if (!match || match === "ambiguous") return item;
+
+  return {
+    ...item,
+    sku: match.sku,
+    product_barcode: item.product_barcode?.trim() ? item.product_barcode : match.barcode,
   };
 }
 

@@ -19,6 +19,7 @@ Run migrations in order against a **new** Supabase project (separate from Aeris 
 13. `013_biteship_routing_code.sql` — Biteship routing code
 14. `014_biteship_package_spec.sql` — package dimensions for Biteship
 15. `015_product_sku.sql` — catalog SKU, request-line SKU, and foreign key
+16. `016_backfill_sku_by_product_name.sql` — fill SKUs on older name-only shipment lines
 
 Apply via Supabase SQL Editor (paste each file in order) or `supabase db push` if linked locally.
 

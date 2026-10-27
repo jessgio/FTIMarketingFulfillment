@@ -105,13 +105,21 @@ export function buildMarketingHistoryExportCsv(requests: MarketingRequest[]): st
   return rows.join("\r\n");
 }
 
-export function downloadMarketingHistoryExport(
+export async function downloadMarketingHistoryExport(
   requests: MarketingRequest[],
   filenamePrefix = "marketing-shipments-export"
-): void {
+): Promise<void> {
   if (requests.length === 0) return;
 
-  const csv = buildMarketingHistoryExportCsv(requests);
+  let exportRequests = requests;
+  try {
+    const { attachCatalogSkus } = await import("./marketingDb");
+    exportRequests = await attachCatalogSkus(requests);
+  } catch (err: unknown) {
+    console.warn("Catalog SKU lookup skipped for export:", err);
+  }
+
+  const csv = buildMarketingHistoryExportCsv(exportRequests);
   const stamp = new Date().toISOString().slice(0, 10);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

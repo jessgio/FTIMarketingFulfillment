@@ -6,7 +6,7 @@ import {
   parseMarketingImportCsv,
   buildMarketingImportTemplateCsv,
 } from "../src/lib/marketingImport.ts";
-import { resolveRequestLine } from "../src/lib/productSku.ts";
+import { fillMissingSkuFromCatalog, resolveRequestLine } from "../src/lib/productSku.ts";
 
 const catalog = [
   { barcode: "8801234567890", sku: "LIP-ROSE", clean_name: "Lip Gloss Rose" },
@@ -132,5 +132,29 @@ assert.equal(parsed.packages[0].items[0].sku, "LIP-ROSE");
 assert.equal(parsed.packages[0].items[0].product_name, "Lip Gloss Rose");
 assert.equal(parsed.packages[1].items[0].sku, undefined);
 assert.equal(parsed.packages[1].items[0].product_barcode, undefined);
+
+const typedBeforeCatalog = fillMissingSkuFromCatalog(
+  {
+    product_name: "ILLIPE BUTTER BALM - RUBY ROUGE",
+    product_barcode: null,
+    sku: null,
+    qty: 4,
+  },
+  [{ barcode: "8801111111111", sku: "ILLIPE-RUBY", clean_name: "Illipe Butter Balm - Ruby Rouge" }]
+);
+assert.equal(typedBeforeCatalog.product_name, "ILLIPE BUTTER BALM - RUBY ROUGE");
+assert.equal(typedBeforeCatalog.sku, "ILLIPE-RUBY");
+assert.equal(typedBeforeCatalog.product_barcode, "8801111111111");
+
+const alreadySet = fillMissingSkuFromCatalog(
+  {
+    product_name: "Illipe Butter Balm - Ruby Rouge",
+    product_barcode: "8801111111111",
+    sku: "KEEP-ME",
+    qty: 1,
+  },
+  [{ barcode: "8801111111111", sku: "ILLIPE-RUBY", clean_name: "Illipe Butter Balm - Ruby Rouge" }]
+);
+assert.equal(alreadySet.sku, "KEEP-ME");
 
 console.log("product sku tests passed");
