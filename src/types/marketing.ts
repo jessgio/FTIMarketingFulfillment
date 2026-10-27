@@ -106,6 +106,8 @@ export interface MarketingRequestItem {
   id?: string;
   request_id?: string;
   product_barcode: string | null;
+  /** Catalog SKU. Null when the line is a free-text product name. Hidden in the request UI. */
+  sku?: string | null;
   product_name: string;
   qty: number;
 }
@@ -166,5 +168,5 @@ export interface NewMarketingRequestInput {
   country: string;
   notes?: string;
   request_purpose?: string;
-  items: { product_barcode?: string; product_name: string; qty: number }[];
+  items: { product_barcode?: string; sku?: string; product_name: string; qty: number }[];
 }

@@ -4,6 +4,15 @@ import { assertSupabaseConfigured } from "./supabaseConfig";
 import { getSupabaseErrorMessage } from "./supabaseError";
 import { normalizeRequesterDivision } from "./marketingAuth";
 import { canAccessRequestPortal, canFulfill, isAdmin, normalizeUserRole } from "./marketingRoles";
+import {
+  catalogCodeResolved,
+  catalogNameResolved,
+  collectCatalogSkuErrors,
+  resolveRequestLine,
+  type CatalogProduct,
+  type RequestLineInput,
+  type ResolvedRequestLine,
+} from "./productSku";
 import type {
   MarketingRequest,
   MarketingSession,
@@ -22,6 +31,115 @@ async function rememberMarketingRequestPurpose(purpose: string | null): Promise<
     { label: purpose, last_used_at: new Date().toISOString() },
     { onConflict: "label" }
   );
+}
+
+const PRODUCT_COLUMNS = "barcode, sku, clean_name";
+
+function rememberProducts(found: Map<string, CatalogProduct>, rows: CatalogProduct[] | null | undefined) {
+  for (const row of rows ?? []) {
+    if (!row?.barcode || !row.sku || !row.clean_name) continue;
+    found.set(row.barcode, row);
+  }
+}
+
+function ilikeExact(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+async function selectProducts(
+  column: "sku" | "barcode" | "clean_name",
+  values: string[]
+): Promise<CatalogProduct[]> {
+  if (!values.length) return [];
+  const { data, error } = await supabase.from("products").select(PRODUCT_COLUMNS).in(column, values);
+  if (error) throw new Error(getSupabaseErrorMessage(error, "Product lookup failed"));
+  return data ?? [];
+}
+
+async function loadCatalogProducts(items: RequestLineInput[]): Promise<CatalogProduct[]> {
+  const codes = new Set<string>();
+  const names = new Set<string>();
+  for (const item of items) {
+    const sku = item.sku?.trim();
+    const barcode = item.product_barcode?.trim();
+    const name = item.product_name.trim();
+    if (sku) codes.add(sku);
+    if (barcode) codes.add(barcode);
+    if (name) {
+      names.add(name);
+      codes.add(name);
+    }
+  }
+
+  const found = new Map<string, CatalogProduct>();
+  const codeList = [...codes];
+  const nameList = [...names];
+  const [bySku, byBarcode, byName] = await Promise.all([
+    selectProducts("sku", codeList),
+    selectProducts("barcode", codeList),
+    selectProducts("clean_name", nameList),
+  ]);
+  rememberProducts(found, bySku);
+  rememberProducts(found, byBarcode);
+  rememberProducts(found, byName);
+
+  let products = [...found.values()];
+  const missingCodes = codeList.filter((code) => !catalogCodeResolved(products, code));
+  if (missingCodes.length) {
+    const loose = await Promise.all(
+      missingCodes.map(async (code) => {
+        const pattern = ilikeExact(code);
+        const [skuResult, barcodeResult] = await Promise.all([
+          supabase.from("products").select(PRODUCT_COLUMNS).ilike("sku", pattern).limit(5),
+          supabase.from("products").select(PRODUCT_COLUMNS).ilike("barcode", pattern).limit(5),
+        ]);
+        if (skuResult.error) throw new Error(getSupabaseErrorMessage(skuResult.error, "Product lookup failed"));
+        if (barcodeResult.error) {
+          throw new Error(getSupabaseErrorMessage(barcodeResult.error, "Product lookup failed"));
+        }
+        return [...(skuResult.data ?? []), ...(barcodeResult.data ?? [])];
+      })
+    );
+    for (const rows of loose) rememberProducts(found, rows);
+    products = [...found.values()];
+  }
+
+  const missingNames = nameList.filter((name) => !catalogNameResolved(products, name));
+  if (missingNames.length) {
+    const looseNames = await Promise.all(
+      missingNames.map(async (name) => {
+        const { data, error } = await supabase
+          .from("products")
+          .select(PRODUCT_COLUMNS)
+          .ilike("clean_name", ilikeExact(name))
+          .limit(5);
+        if (error) throw new Error(getSupabaseErrorMessage(error, "Product lookup failed"));
+        return data ?? [];
+      })
+    );
+    for (const rows of looseNames) rememberProducts(found, rows);
+  }
+
+  return [...found.values()];
+}
+
+async function resolveRequestLineItems(items: RequestLineInput[]): Promise<ResolvedRequestLine[]> {
+  const products = await loadCatalogProducts(items);
+  return items.map((item) => resolveRequestLine(products, item));
+}
+
+export async function findCatalogSkuErrors(items: RequestLineInput[]): Promise<string[]> {
+  const products = await loadCatalogProducts(items);
+  return collectCatalogSkuErrors(products, items);
+}
+
+function throwItemSaveError(error: unknown, fallback: string): never {
+  const code =
+    error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+  if (code === "23503") {
+    throw new Error("One or more SKUs do not exist in the product catalog.");
+  }
+  throw new Error(getSupabaseErrorMessage(error, fallback));
 }
 
 async function resolveRequesterDivisionForSubmit(session: MarketingSession): Promise<RequesterDivision> {
@@ -125,6 +243,7 @@ export async function createMarketingRequest(
 ): Promise<MarketingRequest> {
   if (!input.items.length) throw new Error("Add at least one item to the request.");
 
+  const resolvedItems = await resolveRequestLineItems(input.items);
   const barcode = generateMarketingBarcode();
   const requestPurpose = normalizeRequestPurpose(input.request_purpose);
   const requesterDivision = await resolveRequesterDivisionForSubmit(session);
@@ -157,17 +276,18 @@ export async function createMarketingRequest(
     throw new Error(getSupabaseErrorMessage(requestError, "Failed to create request"));
   }
 
-  const itemRows = input.items.map((item) => ({
+  const itemRows = resolvedItems.map((item) => ({
     request_id: request.id,
-    product_barcode: item.product_barcode?.trim() || null,
-    product_name: item.product_name.trim(),
+    product_barcode: item.product_barcode,
+    sku: item.sku,
+    product_name: item.product_name,
     qty: item.qty,
   }));
 
   const { error: itemsError } = await supabase.from("marketing_request_items").insert(itemRows);
   if (itemsError) {
     await supabase.from("marketing_requests").delete().eq("id", request.id);
-    throw new Error(getSupabaseErrorMessage(itemsError, "Failed to save request items"));
+    throwItemSaveError(itemsError, "Failed to save request items");
   }
 
   await rememberMarketingRequestPurpose(requestPurpose);
@@ -202,6 +322,7 @@ export async function updateMarketingRequest(
 ): Promise<MarketingRequest> {
   if (!input.items.length) throw new Error("Add at least one item to the request.");
 
+  const resolvedItems = await resolveRequestLineItems(input.items);
   await assertMarketingRequestEditable(session, id);
 
   const requestPurpose = normalizeRequestPurpose(input.request_purpose);
@@ -241,16 +362,17 @@ export async function updateMarketingRequest(
     throw new Error(getSupabaseErrorMessage(deleteItemsError, "Failed to update request items"));
   }
 
-  const itemRows = input.items.map((item) => ({
+  const itemRows = resolvedItems.map((item) => ({
     request_id: id,
-    product_barcode: item.product_barcode?.trim() || null,
-    product_name: item.product_name.trim(),
+    product_barcode: item.product_barcode,
+    sku: item.sku,
+    product_name: item.product_name,
     qty: item.qty,
   }));
 
   const { error: itemsError } = await supabase.from("marketing_request_items").insert(itemRows);
   if (itemsError) {
-    throw new Error(getSupabaseErrorMessage(itemsError, "Failed to save request items"));
+    throwItemSaveError(itemsError, "Failed to save request items");
   }
 
   await rememberMarketingRequestPurpose(requestPurpose);
@@ -663,20 +785,29 @@ export async function markMarketingRequestShipped(
   };
 }
 
-export async function searchProducts(query: string): Promise<
-  { barcode: string; clean_name: string }[]
-> {
+export async function searchProducts(query: string): Promise<CatalogProduct[]> {
   const term = query.trim();
   if (term.length < 2) return [];
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("barcode, clean_name")
-    .or(`clean_name.ilike.%${term}%,barcode.ilike.%${term}%`)
-    .limit(12);
+  const safe = term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+  const pattern = `%${safe}%`;
+  const [names, skus, barcodes] = await Promise.all([
+    supabase.from("products").select(PRODUCT_COLUMNS).ilike("clean_name", pattern).limit(12),
+    supabase.from("products").select(PRODUCT_COLUMNS).ilike("sku", pattern).limit(12),
+    supabase.from("products").select(PRODUCT_COLUMNS).ilike("barcode", pattern).limit(12),
+  ]);
 
-  if (error) throw new Error(getSupabaseErrorMessage(error, "Product search failed"));
-  return data ?? [];
+  for (const result of [names, skus, barcodes]) {
+    if (result.error) throw new Error(getSupabaseErrorMessage(result.error, "Product search failed"));
+  }
+
+  const found = new Map<string, CatalogProduct>();
+  for (const row of [...(names.data ?? []), ...(skus.data ?? []), ...(barcodes.data ?? [])]) {
+    if (!row.barcode || found.has(row.barcode)) continue;
+    found.set(row.barcode, row);
+    if (found.size === 12) break;
+  }
+  return [...found.values()];
 }
 
 export async function fetchUnseenMarketingOrderCounts(session: MarketingSession): Promise<{

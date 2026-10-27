@@ -26,7 +26,7 @@ npm run dev
 
 1. Create a project at [supabase.com](https://supabase.com) for FTI.
 2. Run all SQL migrations in `supabase/migrations/` in order (see `supabase/README.md`).
-3. Import products into the `products` table.
+3. Import products into the `products` table (`barcode`, `sku`, `clean_name`). Requesters see the product name; shipment exports include `sku`. Apply `015_product_sku.sql` before using SKU checks.
 4. Copy **Project URL** and **anon public** key into `.env.local`.
 
 ## Vercel deployment

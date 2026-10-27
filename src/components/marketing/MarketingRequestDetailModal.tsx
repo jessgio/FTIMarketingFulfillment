@@ -147,9 +147,6 @@ export function MarketingRequestDetailModal({
               {(request.items ?? []).map((item) => (
                 <li key={item.id ?? `${item.product_name}-${item.qty}`}>
                   <span className="font-bold tabular-nums">{item.qty}×</span> {item.product_name}
-                  {item.product_barcode && (
-                    <span className="text-gray-500 font-mono text-xs ml-2">{item.product_barcode}</span>
-                  )}
                 </li>
               ))}
             </ul>
